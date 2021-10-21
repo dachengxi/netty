@@ -186,12 +186,131 @@ import io.netty.channel.ChannelHandlerContext;
  */
 public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
 
+    /*
+        示例1
+        解码前的数据长度14个字节             解码后的数据长度14个字节
+        +--------+----------------+      +--------+----------------+
+        | Length | Actual Content |----->| Length | Actual Content |
+        |   12   | "HELLO, WORLD" |      |   12   | "HELLO, WORLD" |
+        +--------+----------------+      +--------+----------------+
+        表示长度的域是2个字节，长度域中数据长度是12个字节，实际数据的长度是12个字节，
+        接受到数据总长度是14个字节，解码后的数据是接收到的整个数据14个字节：
+        - lengthFieldOffset=0，长度域偏移为0，开始的2个字节就是长度域
+        - lengthFieldLength=2，长度域的字节数是2
+        - lengthAdjustment=0，长度域只包含数据的长度，不需要修正
+        - initialBytesToStrip=0，要解码的数据前后长度一样，不需要跳过任何字节数据
+
+        示例2
+        解码前的数据长度14个字节             解码后的数据长度12个字节
+        +--------+----------------+      +----------------+
+        | Length | Actual Content |----->| Actual Content |
+        |   12   | "HELLO, WORLD" |      | "HELLO, WORLD" |
+        +--------+----------------+      +----------------+
+        表示长度的域是2个字节，长度域中数据长度是12个字节，实际数据长度是12个字节，
+        接收到数据总长度是14个字节，解码后的数据是除了长度外的实际数据12个字节：
+        - lengthFieldOffset=0，长度域偏移为0，开始的两个字节就是长度域
+        - lengthFieldLength=2，长度域的字节数是2
+        - lengthAdjustment=0，长度域只包含数据的长度，不需要修正
+        - initialBytesToStrip=2，解码后的数据不包含长度域，所以需要跳过2个字节的长度
+
+        示例3
+        解码前的数据长度14个字节             解码后的数据长度14个字节
+        +--------+----------------+      +--------+----------------+
+        | Length | Actual Content |----->| Length | Actual Content |
+        |   14   | "HELLO, WORLD" |      |   14   | "HELLO, WORLD" |
+        +--------+----------------+      +--------+----------------+
+        表示长度的域是2个字节，长度域中数据长度是14个字节，实际数据长度是12个字节，
+        接收到数据总长度是14个字节，解码后的数据是接收到的整个数据14个字节：
+        - lengthFieldOffset=0，长度域偏移为0，开始的两个字节就是长度域
+        - lengthFieldLength=2，长度域的字节数是2
+        - lengthAdjustment=-2，长度域中的数据是14，包含了长度域和实际数据长度，所以需要修正：减去2
+        - initialBytesToStrip=0，要解码的数据前后长度一样，不需要跳过任何字节数据
+
+        示例4
+        解码前的数据长度17个字节                          解码后的数据长度17个字节
+        +----------+----------+----------------+      +----------+----------+----------------+
+        | Header 1 |  Length  | Actual Content |----->| Header 1 |  Length  | Actual Content |
+        |  0xCAFE  |    12    | "HELLO, WORLD" |      |  0xCAFE  |    12    | "HELLO, WORLD" |
+        +----------+----------+----------------+      +----------+----------+----------------+
+        最开始的2个字节中数据是额外的Header数据，表示长度的域是3个字节，长度域中数据长度是12个字节，
+        实际数据长度是12个字节，接收到数据的总长度是17个字节，解码后的数据是接收到的整个数据17个字节：
+        - lengthFieldOffset=2，长度域偏移为2，开始的两个字节是额外的Header的长度，需要跳过
+        - lengthFieldLength=3，长度域的字节数是3
+        - lengthAdjustment=0，长度域只包含数据的长度，不需要修正
+        - initialBytesToStrip=0，要解码的数据前后长度一样，不需要跳过任何字节数据
+
+        示例5
+        解码前的数据长度17个字节                          解码后的数据长度17个字节
+        +----------+----------+----------------+      +----------+----------+----------------+
+        |  Length  | Header 1 | Actual Content |----->|  Length  | Header 1 | Actual Content |
+        |    12    |  0xCAFE  | "HELLO, WORLD" |      |    12    |  0xCAFE  | "HELLO, WORLD" |
+        +----------+----------+----------------+      +----------+----------+----------------+
+        表示长度域的是3个字节，跟在长度域后面的2个字节长度是额外的Header数据，长度域中数据长度是12个字节，
+        实际数据长度是12个字节，接收到的数据总长度是17个字节，解码后的数据是接收到的整个数据17个字节：
+        - lengthFieldOffset=0，长度域偏移为0，开始的3个字节就是长度域
+        - lengthFieldLength=3，长度域的字节数是3
+        - lengthAdjustment=2，长度域中12字节是实际数据的长度，我们要处理的数据是额外Header数据+实际数据，所以要把长度+2
+        - initialBytesToStrip=0，要解码的数据前后长度一样，不需要跳过任何字节数据
+
+        示例6
+        解码前的数据长度16个字节                           解码后的数据长度13个字节
+        +------+--------+------+----------------+      +------+----------------+
+        | HDR1 | Length | HDR2 | Actual Content |----->| HDR2 | Actual Content |
+        | 0xCA |   12   | 0xFE | "HELLO, WORLD" |      | 0xFE | "HELLO, WORLD" |
+        +------+--------+------+----------------+      +------+----------------+
+        最开始的一个字节是HDR1数据，接下来是2个字节的长度域，长度域后面的是一个字节的HDR2数据，
+        长度域中数据长度是12个字节，实际数据长度是12个字节，接收到的数据总长度是16个字节，解码后的数据是
+        HDR2+实际数据=13个字节：
+        - lengthFieldOffset=1，长度域偏移为1，最开始的1个字节是HDR1数据，需要跳过
+        - lengthFieldLength=2，长度域的字节数是2
+        - lengthAdjustment=1，长度域中12字节是实际数据的长度，我们要处理的数据是HDE2数据+实际数据，所以要把长度+1
+        - initialBytesToStrip=3，解码后的数据不包含HDR1和长度域，所以要跳过3个字节
+
+        示例7
+        解码前的数据长度是16个字节                         解码后的数据长度是13个字节
+        +------+--------+------+----------------+      +------+----------------+
+        | HDR1 | Length | HDR2 | Actual Content |----->| HDR2 | Actual Content |
+        | 0xCA |   16   | 0xFE | "HELLO, WORLD" |      | 0xFE | "HELLO, WORLD" |
+        +------+--------+------+----------------+      +------+----------------+
+        最开始的一个字节是HDR1数据，接下来是2个字节的长度域，长度域后面的是一个字节的HDR2数据，
+        长度域中数据长度是16个字节，实际数据长度是12个字节，接收到的数据总长度是16个字节，解码后的数据是
+        HDR2+实际数据=13个字节：
+        - lengthFieldOffset=1，长度域偏移为1，最开始的1个字节是HDR1数据，需要跳过
+        - lengthFieldLength=2，长度域的字节数是2
+        - lengthAdjustment=-3，长度域中12字节是实际数据的长度，我们要处理的数据是HDE2数据+实际数据，所以要把长度-3
+        - initialBytesToStrip=3，解码后的数据不包含HDR1和长度域，所以要跳过3个字节
+     */
+
     private final ByteOrder byteOrder;
+
+    /**
+     * 最大帧长度，就是可以接收的数据的最大长度，如果数据长度超过这个，则丢弃掉。
+     */
     private final int maxFrameLength;
+
+    /**
+     * 数据开始的几个字节可能不是表示数据长度，需要跳过前面的几个字节
+     */
     private final int lengthFieldOffset;
+
+    /**
+     * 长度域的字节数，表示这个长度域有多少字节
+     */
     private final int lengthFieldLength;
+
+    /**
+     * 长度域结束的偏移量，是通过lengthFieldOffset + lengthFieldLength计算出来的
+     */
     private final int lengthFieldEndOffset;
+
+    /**
+     * 数据长度修正
+     */
     private final int lengthAdjustment;
+
+    /**
+     * 需要跳过的字节数
+     */
     private final int initialBytesToStrip;
     private final boolean failFast;
     private boolean discardingTooLongFrame;
@@ -322,11 +441,19 @@ public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
         this.lengthFieldOffset = lengthFieldOffset;
         this.lengthFieldLength = lengthFieldLength;
         this.lengthAdjustment = lengthAdjustment;
+        // 长度域结束偏移量 = 长度域偏移量 + 长度域的长度
         this.lengthFieldEndOffset = lengthFieldOffset + lengthFieldLength;
         this.initialBytesToStrip = initialBytesToStrip;
         this.failFast = failFast;
     }
 
+    /**
+     *
+     * @param ctx           the {@link ChannelHandlerContext} which this {@link ByteToMessageDecoder} belongs to
+     * @param in            表示到目前为止还没有拆包完的数据
+     * @param out           out这个列表中存储拆完之后的包
+     * @throws Exception
+     */
     @Override
     protected final void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
         Object decoded = decode(ctx, in);
@@ -398,23 +525,70 @@ public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
             discardingTooLongFrame(in);
         }
 
+        /*
+            lengthFieldEndOffset
+            长度域结束偏移量 = 长度域偏移量 + 长度域的长度
+            如果当前可读的字节数比长度域结束偏移量小，说明数据不全，
+            连长度域都没法读取，直接返回不读
+         */
         if (in.readableBytes() < lengthFieldEndOffset) {
             return null;
         }
 
+        /*
+            实际长度域的偏移量
+            比如这种情况：
+            示例4
+            解码前的数据长度17个字节                          解码后的数据长度17个字节
+            +----------+----------+----------------+      +----------+----------+----------------+
+            | Header 1 |  Length  | Actual Content |----->| Header 1 |  Length  | Actual Content |
+            |  0xCAFE  |    12    | "HELLO, WORLD" |      |  0xCAFE  |    12    | "HELLO, WORLD" |
+            +----------+----------+----------------+      +----------+----------+----------------+
+            最开始的2个字节中数据是额外的Header数据，表示长度的域是3个字节，长度域中数据长度是12个字节，
+            实际数据长度是12个字节，接收到数据的总长度是17个字节，解码后的数据是接收到的整个数据17个字节：
+            - lengthFieldOffset=2，长度域偏移为2，开始的两个字节是额外的Header的长度，需要跳过
+            - lengthFieldLength=3，长度域的字节数是3
+            - lengthAdjustment=0，长度域只包含数据的长度，不需要修正
+            - initialBytesToStrip=0，要解码的数据前后长度一样，不需要跳过任何字节数据
+            这其中readerIndex=0，lengthFieldOffset=2，所以actualLengthFieldOffset=2
+
+            下面这种情况：
+            示例1
+            解码前的数据长度14个字节             解码后的数据长度14个字节
+            +--------+----------------+      +--------+----------------+
+            | Length | Actual Content |----->| Length | Actual Content |
+            |   12   | "HELLO, WORLD" |      |   12   | "HELLO, WORLD" |
+            +--------+----------------+      +--------+----------------+
+            表示长度的域是2个字节，长度域中数据长度是12个字节，实际数据的长度是12个字节，
+            接受到数据总长度是14个字节，解码后的数据是接收到的整个数据14个字节：
+            - lengthFieldOffset=0，长度域偏移为0，开始的2个字节就是长度域
+            - lengthFieldLength=2，长度域的字节数是2
+            - lengthAdjustment=0，长度域只包含数据的长度，不需要修正
+            - initialBytesToStrip=0，要解码的数据前后长度一样，不需要跳过任何字节数据
+            这其中readerIndex=0，lengthFieldOffset=0，所以actualLengthFieldOffset=0
+         */
         int actualLengthFieldOffset = in.readerIndex() + lengthFieldOffset;
+        // 读取长度域中的长度
         long frameLength = getUnadjustedFrameLength(in, actualLengthFieldOffset, lengthFieldLength, byteOrder);
 
+        // 长度域中的长度小于0，抛异常
         if (frameLength < 0) {
             failOnNegativeLengthField(in, frameLength, lengthFieldEndOffset);
         }
 
+        /*
+            lengthFieldEndOffset = lengthFieldOffset + lengthFieldLength
+            frameLength = frameLength + lengthAdjustment + lengthFieldOffset + lengthFieldLength;
+            这里计算出来就是解码后的数据长度
+         */
         frameLength += lengthAdjustment + lengthFieldEndOffset;
 
+        // 实际要解码的数据长度比长度域的长度还小，抛异常
         if (frameLength < lengthFieldEndOffset) {
             failOnFrameLengthLessThanLengthFieldEndOffset(in, frameLength, lengthFieldEndOffset);
         }
 
+        // 超过了最大的数据长度，丢弃掉
         if (frameLength > maxFrameLength) {
             exceededFrameLength(in, frameLength);
             return null;
@@ -422,19 +596,26 @@ public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
 
         // never overflows because it's less than maxFrameLength
         int frameLengthInt = (int) frameLength;
+        // 可读的数据比要的数据小，返回null，等待下一次解码
         if (in.readableBytes() < frameLengthInt) {
             return null;
         }
 
+        // 要跳过的字节大于数据长度，抛异常
         if (initialBytesToStrip > frameLengthInt) {
             failOnFrameLengthLessThanInitialBytesToStrip(in, frameLength, initialBytesToStrip);
         }
+        // 跳过initialBytesToStrip指定的字节数
         in.skipBytes(initialBytesToStrip);
 
         // extract frame
+        // 当前读指针
         int readerIndex = in.readerIndex();
+        // 实际需要的数据长度
         int actualFrameLength = frameLengthInt - initialBytesToStrip;
+        // 抽取从readerIndex开始，长度是actualFrameLength的数据
         ByteBuf frame = extractFrame(ctx, in, readerIndex, actualFrameLength);
+        // 移动读指针
         in.readerIndex(readerIndex + actualFrameLength);
         return frame;
     }
