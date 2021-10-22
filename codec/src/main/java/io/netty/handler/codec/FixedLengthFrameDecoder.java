@@ -39,6 +39,9 @@ import java.util.List;
  * </pre>
  */
 public class FixedLengthFrameDecoder extends ByteToMessageDecoder {
+    /*
+        固定长度的解码器，按照指定长度对消息进行解码
+     */
 
     private final int frameLength;
 

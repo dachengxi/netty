@@ -34,6 +34,9 @@ import java.util.List;
  * For a more general delimiter-based decoder, see {@link DelimiterBasedFrameDecoder}.
  */
 public class LineBasedFrameDecoder extends ByteToMessageDecoder {
+    /*
+        基于回车换行符的解码器，以\n或者\r\n作为结束符
+     */
 
     /** Maximum length of a frame we're willing to decode.  */
     private final int maxLength;

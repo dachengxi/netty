@@ -187,6 +187,7 @@ import io.netty.channel.ChannelHandlerContext;
 public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
 
     /*
+        通用解码器，在协议头中会有专门指定长度的字段
         示例1
         解码前的数据长度14个字节             解码后的数据长度14个字节
         +--------+----------------+      +--------+----------------+

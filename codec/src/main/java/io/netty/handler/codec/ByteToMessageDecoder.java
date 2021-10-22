@@ -73,6 +73,9 @@ import static java.lang.Integer.MAX_VALUE;
  * to avoid leaking memory.
  */
 public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter {
+    /*
+        ByteToMessageDecoder用于将二进制数据（字节数组）进行解码，得到我们需要的消息
+     */
 
     /**
      * Cumulate {@link ByteBuf}s by merge them into one {@link ByteBuf}'s, using memory copies.
