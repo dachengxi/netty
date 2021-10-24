@@ -25,6 +25,7 @@ import static io.netty.util.internal.ObjectUtil.checkNotNull;
 
 /**
  * Special {@link AbstractList} implementation which is used within our codec base classes.
+ * 该List在线程中被缓存，可循环存储解码结果
  */
 final class CodecOutputList extends AbstractList<Object> implements RandomAccess {
 
