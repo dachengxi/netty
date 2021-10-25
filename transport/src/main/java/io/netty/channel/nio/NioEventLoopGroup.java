@@ -35,9 +35,20 @@ import java.util.concurrent.ThreadFactory;
 /**
  * {@link MultithreadEventLoopGroup} implementations which is used for NIO {@link Selector} based {@link Channel}s.
  *
- * NioEventLoopGroup是一个带有Schedule类型的线程池
  */
 public class NioEventLoopGroup extends MultithreadEventLoopGroup {
+
+    /*
+        NioEventLoopGroup可认为是一个带有Schedule类型的线程池。
+
+        在使用的时候一般是如下的方式：
+        EventLoopGroup boss = new NioEventLoopGroup();
+        EventLoopGroup worker = new NioEventLoopGroup();
+
+        boss对应Reactor的主线程，用来处理连接事件，worker对应Reactor的子线程，用来处理读写事件。
+
+
+     */
 
     /**
      * Create a new instance using the default number of threads, the default {@link ThreadFactory} and
