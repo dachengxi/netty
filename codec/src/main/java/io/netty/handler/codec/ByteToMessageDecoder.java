@@ -79,6 +79,9 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
 
         使用了一个全局缓存，每次解码数据的时候都只解码一个完整的数据，如果数据不全或者是多条数据，
         则将不全的数据或者多出来的数据放到缓存中，下次继续解码。
+
+        解码完成的数据也会放到一个List中，如果一次解码后如果有解码成功的消息，需要将解码后的消息
+        传递给后续的ChannelHandler进行处理。
      */
 
     /**
@@ -510,16 +513,16 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
 
                 // out为空，说明具体的子类实现没有解码到数据
                 if (out.isEmpty()) {
-                    // ByteBuf可读字节数没有变化，跳出循环
+                    // ByteBuf可读字节数没有变化，说明当前缓存还不足以解析成一个业务数据，跳出循环，等待下一次接收数据再次解析
                     if (oldInputLength == in.readableBytes()) {
                         break;
                     } else {
-                        // 可读字节数有变化，继续处理
+                        // 可读字节数有变化，说明可能有部分数据已经被解析成功了，继续处理
                         continue;
                     }
                 }
 
-                // 可读字节数有有变化，到这里说明out中有已经解码后的数据
+                // 到这里说明out中有已经解码后的数据，但是可读字节数没有变化，子类实现的decode方法有问题，抛出异常
                 if (oldInputLength == in.readableBytes()) {
                     throw new DecoderException(
                             StringUtil.simpleClassName(getClass()) +
@@ -550,7 +553,7 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
      *
      * 自定义解码器需要实现该方法
      * in表示累积器已经累积的字节流数据
-     * out表示本次可从累积的数据中解码出来的结果列表
+     * out表示可从累积的数据中解码出来的结果列表
      */
     protected abstract void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception;
 

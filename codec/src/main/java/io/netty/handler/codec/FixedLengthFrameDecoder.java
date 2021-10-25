@@ -43,6 +43,9 @@ public class FixedLengthFrameDecoder extends ByteToMessageDecoder {
         固定长度的解码器，按照指定长度对消息进行解码
      */
 
+    /**
+     * 消息长度
+     */
     private final int frameLength;
 
     /**
@@ -73,9 +76,11 @@ public class FixedLengthFrameDecoder extends ByteToMessageDecoder {
      */
     protected Object decode(
             @SuppressWarnings("UnusedParameters") ChannelHandlerContext ctx, ByteBuf in) throws Exception {
+        // 可读字节数比需要的长度小，直接跳过，等待后续数据下次继续解码
         if (in.readableBytes() < frameLength) {
             return null;
         } else {
+            // 读取指定长度的数据
             return in.readRetainedSlice(frameLength);
         }
     }

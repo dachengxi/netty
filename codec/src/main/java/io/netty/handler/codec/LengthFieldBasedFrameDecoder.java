@@ -187,7 +187,7 @@ import io.netty.channel.ChannelHandlerContext;
 public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
 
     /*
-        通用解码器，在协议头中会有专门指定长度的字段
+        通用解码器，通常可以将消息分为头和消息体两部分，在协议头中会有专门指定长度的字段
         示例1
         解码前的数据长度14个字节             解码后的数据长度14个字节
         +--------+----------------+      +--------+----------------+
@@ -314,8 +314,20 @@ public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
      */
     private final int initialBytesToStrip;
     private final boolean failFast;
+
+    /**
+     * 设置是否需要将过长的消息丢弃掉
+     */
     private boolean discardingTooLongFrame;
+
+    /**
+     * 消息过长的长度
+     */
     private long tooLongFrameLength;
+
+    /**
+     * 过长的消息丢弃的字节数
+     */
     private long bytesToDiscard;
 
     /**
@@ -451,13 +463,15 @@ public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
     /**
      *
      * @param ctx           the {@link ChannelHandlerContext} which this {@link ByteToMessageDecoder} belongs to
-     * @param in            表示到目前为止还没有拆包完的数据
-     * @param out           out这个列表中存储拆完之后的包
+     * @param in            表示累积器已经累积的字节流数据
+     * @param out           表示可从累积的数据中解码出来的结果列表
      * @throws Exception
      */
     @Override
     protected final void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
+        // LengthFieldBasedFrameDecoder的具体解码过程
         Object decoded = decode(ctx, in);
+        // 如果能解码出来数据，就将解码后的结果放到out这个List中，这个解码后的结果会继续传给后续的ChannelHandler进行处理
         if (decoded != null) {
             out.add(decoded);
         }
@@ -522,6 +536,7 @@ public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
      *                          be created.
      */
     protected Object decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
+        // 处理如果消息过长需要丢弃一部分数据
         if (discardingTooLongFrame) {
             discardingTooLongFrame(in);
         }
@@ -529,8 +544,8 @@ public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
         /*
             lengthFieldEndOffset
             长度域结束偏移量 = 长度域偏移量 + 长度域的长度
-            如果当前可读的字节数比长度域结束偏移量小，说明数据不全，
-            连长度域都没法读取，直接返回不读
+            如果当前可读的字节数比长度域结束偏移量小，说明数据不全，连长度域都没法读取，直接返回不读。
+            会等待接收下一次的数据后，再进行解析
          */
         if (in.readableBytes() < lengthFieldEndOffset) {
             return null;
@@ -618,6 +633,7 @@ public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
         ByteBuf frame = extractFrame(ctx, in, readerIndex, actualFrameLength);
         // 移动读指针
         in.readerIndex(readerIndex + actualFrameLength);
+        // 返回读取到的数据，这个数据将被添加到out这个List中，后续在ByteToMessageDecoder中会被传到后面的ChannelHandler继续处理
         return frame;
     }
 
