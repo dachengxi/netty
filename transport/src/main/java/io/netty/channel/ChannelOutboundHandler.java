@@ -19,6 +19,7 @@ import java.net.SocketAddress;
 
 /**
  * {@link ChannelHandler} which will get notified for IO-outbound-operations.
+ * 定义对写IO事件的处理
  */
 public interface ChannelOutboundHandler extends ChannelHandler {
     /**
@@ -28,6 +29,7 @@ public interface ChannelOutboundHandler extends ChannelHandler {
      * @param localAddress  the {@link SocketAddress} to which it should bound
      * @param promise       the {@link ChannelPromise} to notify once the operation completes
      * @throws Exception    thrown if an error occurs
+     * 绑定操作触发后调用
      */
     void bind(ChannelHandlerContext ctx, SocketAddress localAddress, ChannelPromise promise) throws Exception;
 
@@ -39,6 +41,7 @@ public interface ChannelOutboundHandler extends ChannelHandler {
      * @param localAddress      the {@link SocketAddress} which is used as source on connect
      * @param promise           the {@link ChannelPromise} to notify once the operation completes
      * @throws Exception        thrown if an error occurs
+     * 连接服务端后调用
      */
     void connect(
             ChannelHandlerContext ctx, SocketAddress remoteAddress,
@@ -50,6 +53,7 @@ public interface ChannelOutboundHandler extends ChannelHandler {
      * @param ctx               the {@link ChannelHandlerContext} for which the disconnect operation is made
      * @param promise           the {@link ChannelPromise} to notify once the operation completes
      * @throws Exception        thrown if an error occurs
+     * 主动断开连接后调用
      */
     void disconnect(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception;
 
@@ -59,6 +63,7 @@ public interface ChannelOutboundHandler extends ChannelHandler {
      * @param ctx               the {@link ChannelHandlerContext} for which the close operation is made
      * @param promise           the {@link ChannelPromise} to notify once the operation completes
      * @throws Exception        thrown if an error occurs
+     * 主动关闭通道后调用
      */
     void close(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception;
 
@@ -73,6 +78,7 @@ public interface ChannelOutboundHandler extends ChannelHandler {
 
     /**
      * Intercepts {@link ChannelHandlerContext#read()}.
+     * 读取数据
      */
     void read(ChannelHandlerContext ctx) throws Exception;
 
@@ -85,6 +91,7 @@ public interface ChannelOutboundHandler extends ChannelHandler {
      * @param msg               the message to write
      * @param promise           the {@link ChannelPromise} to notify once the operation completes
      * @throws Exception        thrown if an error occurs
+     * 写数据
      */
     void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception;
 
@@ -94,6 +101,7 @@ public interface ChannelOutboundHandler extends ChannelHandler {
      *
      * @param ctx               the {@link ChannelHandlerContext} for which the flush operation is made
      * @throws Exception        thrown if an error occurs
+     * 刷新Channel
      */
     void flush(ChannelHandlerContext ctx) throws Exception;
 }

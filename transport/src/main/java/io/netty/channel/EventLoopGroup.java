@@ -21,6 +21,9 @@ import io.netty.util.concurrent.EventExecutorGroup;
  * Special {@link EventExecutorGroup} which allows registering {@link Channel}s that get
  * processed for later selection during the event loop.
  *
+ * EventLoopGroup相当于一个线程池，是一组EventLoop的集合。
+ * 每个EventLoopGroup是一个Reactor线程池，实际使用的时候会创建两个EventLoopGroup，一个是bossEventLoopGroup，
+ * 用来接收客户端连接，另一个是workerEventLoopGroup，用来处理IO相关的操作等。
  */
 public interface EventLoopGroup extends EventExecutorGroup {
     /**

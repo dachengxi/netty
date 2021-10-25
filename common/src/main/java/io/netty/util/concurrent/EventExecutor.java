@@ -21,6 +21,7 @@ package io.netty.util.concurrent;
  * Besides this, it also extends the {@link EventExecutorGroup} to allow for a generic
  * way to access methods.
  *
+ * EventExecutor事件执行器，是EventExecutorGroup里执行任务的最小单元
  */
 public interface EventExecutor extends EventExecutorGroup {
 
