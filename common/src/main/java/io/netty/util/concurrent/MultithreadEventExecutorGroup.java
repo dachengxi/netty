@@ -32,10 +32,22 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public abstract class MultithreadEventExecutorGroup extends AbstractEventExecutorGroup {
 
+    /**
+     * 存放EventLoopGroup对应的EventLoop
+     */
     private final EventExecutor[] children;
     private final Set<EventExecutor> readonlyChildren;
+
+    /**
+     * 已经停止工作的EventLoop的个数
+     */
     private final AtomicInteger terminatedChildren = new AtomicInteger();
     private final Promise<?> terminationFuture = new DefaultPromise(GlobalEventExecutor.INSTANCE);
+
+    /**
+     * Boss和Worker EventLoopGroup中都有可能有多个EventLoop，
+     * chooser用来选择使用哪个EventLoop来处理请求
+     */
     private final EventExecutorChooserFactory.EventExecutorChooser chooser;
 
     /**
@@ -73,14 +85,26 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
         checkPositive(nThreads, "nThreads");
 
         if (executor == null) {
+            // 不指定线程池的话，默认是ThreadPerTaskExecutor
             executor = new ThreadPerTaskExecutor(newDefaultThreadFactory());
         }
 
+        /*
+            如果是Boss EventLoopGroup，一般指定nThreads为1。
+            如果是Worker EventLoopGroup，如果不指定NThreads，则默认是处理器个数*2。
+
+            children存放EventLoopGroup对应的EventLoop。
+         */
         children = new EventExecutor[nThreads];
 
+        // 为EventLoopGroup创建EventLoop，并放到children数组中
         for (int i = 0; i < nThreads; i ++) {
             boolean success = false;
             try {
+                /*
+                    newChild由子类实现，不同的实现来创建不同的EventLoop，
+                    比如NioEventLoopGroup创建的是NioEventLoop实例对象。
+                 */
                 children[i] = newChild(executor, args);
                 success = true;
             } catch (Exception e) {
@@ -108,8 +132,20 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
             }
         }
 
+        /*
+            Boss和Worker EventLoopGroup中都有可能有多个EventLoop，
+            chooser用来选择使用哪个EventLoop来处理请求。
+
+            chooserFactory默认使用的是DefaultEventExecutorChooserFactory，
+            使用轮询来选择处理请求的EventLoop
+         */
         chooser = chooserFactory.newChooser(children);
 
+        /*
+            给每个EventLoop设置一个terminationListener，每个EventLoop停止时都会
+            触发这个Listener，如果所有的EventLoop都停止了，会设置terminationFuture
+            的success为null
+         */
         final FutureListener<Object> terminationListener = new FutureListener<Object>() {
             @Override
             public void operationComplete(Future<Object> future) throws Exception {
@@ -154,6 +190,7 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
      * Create a new EventExecutor which will later then accessible via the {@link #next()}  method. This method will be
      * called for each thread that will serve this {@link MultithreadEventExecutorGroup}.
      *
+     * EventLoopGroup用来创建需要的EventLoop的方法，executor如果group没有指定的话，默认是ThreadPerTaskExecutor。
      */
     protected abstract EventExecutor newChild(Executor executor, Object... args) throws Exception;
 

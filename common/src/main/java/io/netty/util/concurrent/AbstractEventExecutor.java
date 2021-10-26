@@ -37,6 +37,9 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
     static final long DEFAULT_SHUTDOWN_QUIET_PERIOD = 2;
     static final long DEFAULT_SHUTDOWN_TIMEOUT = 15;
 
+    /**
+     * 当前EventLoop所属的EventLoopGroup
+     */
     private final EventExecutorGroup parent;
     private final Collection<EventExecutor> selfCollection = Collections.<EventExecutor>singleton(this);
 
@@ -45,6 +48,7 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
     }
 
     protected AbstractEventExecutor(EventExecutorGroup parent) {
+        // 当前EventLoop所属的EventLoopGroup
         this.parent = parent;
     }
 

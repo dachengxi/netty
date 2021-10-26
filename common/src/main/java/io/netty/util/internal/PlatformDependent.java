@@ -939,7 +939,18 @@ public final class PlatformDependent {
         return hash;
     }
 
+    /**
+     * MPSC无锁队列
+     */
     private static final class Mpsc {
+        /*
+            Mpsc无锁队列
+            M：Multiple，多个的
+            P：Producer，生产者
+            S：Single，单个的
+            C：Consumer，消费者
+            MPSC队列是一个适用于多个生产者单个消费者的高性能无锁队列
+         */
         private static final boolean USE_MPSC_CHUNKED_ARRAY_QUEUE;
 
         private Mpsc() {

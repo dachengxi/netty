@@ -56,13 +56,23 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     @SuppressWarnings("unchecked")
     private static final Map.Entry<AttributeKey<?>, Object>[] EMPTY_ATTRIBUTE_ARRAY = new Map.Entry[0];
 
+    /**
+     * Boss EventLoopGroup
+     */
     volatile EventLoopGroup group;
+
+    /**
+     * 用来根据指定的channel的class来通过反射生成SocketChannel的实例
+     */
     @SuppressWarnings("deprecation")
     private volatile ChannelFactory<? extends C> channelFactory;
     private volatile SocketAddress localAddress;
 
     // The order in which ChannelOptions are applied is important they may depend on each other for validation
     // purposes.
+    /**
+     * ServerBootstrap或者Bootstrap的一些选项
+     */
     private final Map<ChannelOption<?>, Object> options = new LinkedHashMap<ChannelOption<?>, Object>();
     private final Map<AttributeKey<?>, Object> attrs = new ConcurrentHashMap<AttributeKey<?>, Object>();
     private volatile ChannelHandler handler;
@@ -104,6 +114,9 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
      * The {@link Class} which is used to create {@link Channel} instances from.
      * You either use this or {@link #channelFactory(io.netty.channel.ChannelFactory)} if your
      * {@link Channel} implementation has no no-args constructor.
+     * 设置ServerBootstrap或者Bootstrap的channel，ServerBootstrap可设置NioServerSocketChannel.class，
+     * Bootstrap可设置为NioSocketChanel.class，这里并没有直接实例化对应的SocketChannel对象，而是生成了
+     * 一个对应的工厂，等使用的时候通过反射来生成SocketChannel对象实例
      */
     public B channel(Class<? extends C> channelClass) {
         return channelFactory(new ReflectiveChannelFactory<C>(
@@ -169,6 +182,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     /**
      * Allow to specify a {@link ChannelOption} which is used for the {@link Channel} instances once they got
      * created. Use a value of {@code null} to remove a previous set {@link ChannelOption}.
+     * 设置ServerBootstrap或者Bootstrap的一些选项
      */
     public <T> B option(ChannelOption<T> option, T value) {
         ObjectUtil.checkNotNull(option, "option");

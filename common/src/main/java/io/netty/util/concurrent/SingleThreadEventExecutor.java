@@ -79,6 +79,10 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     private volatile Thread thread;
     @SuppressWarnings("unused")
     private volatile ThreadProperties threadProperties;
+
+    /**
+     * 如果NioEventLoopGroup不指定的话，默认是ThreadPerTaskExecutor
+     */
     private final Executor executor;
     private volatile boolean interrupted;
 
@@ -86,6 +90,10 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     private final Set<Runnable> shutdownHooks = new LinkedHashSet<Runnable>();
     private final boolean addTaskWakesUp;
     private final int maxPendingTasks;
+
+    /**
+     * 拒绝策略，默认是RejectedExecutionHandlers.reject()
+     */
     private final RejectedExecutionHandler rejectedExecutionHandler;
 
     private long lastExecutionTime;
@@ -161,14 +169,24 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         rejectedExecutionHandler = ObjectUtil.checkNotNull(rejectedHandler, "rejectedHandler");
     }
 
+    /**
+     *
+     * @param parent EventLoopGroup
+     * @param executor 如果NioEventLoopGroup不指定的话，默认是ThreadPerTaskExecutor
+     * @param addTaskWakesUp
+     * @param taskQueue
+     * @param rejectedHandler 拒绝策略，默认是RejectedExecutionHandlers.reject()
+     */
     protected SingleThreadEventExecutor(EventExecutorGroup parent, Executor executor,
                                         boolean addTaskWakesUp, Queue<Runnable> taskQueue,
                                         RejectedExecutionHandler rejectedHandler) {
         super(parent);
         this.addTaskWakesUp = addTaskWakesUp;
         this.maxPendingTasks = DEFAULT_MAX_PENDING_EXECUTOR_TASKS;
+        // 如果NioEventLoopGroup不指定的话，默认是ThreadPerTaskExecutor
         this.executor = ThreadExecutorMap.apply(executor, this);
         this.taskQueue = ObjectUtil.checkNotNull(taskQueue, "taskQueue");
+        // 拒绝策略，默认是RejectedExecutionHandlers.reject()
         this.rejectedExecutionHandler = ObjectUtil.checkNotNull(rejectedHandler, "rejectedHandler");
     }
 

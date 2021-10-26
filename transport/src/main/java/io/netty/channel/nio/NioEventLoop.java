@@ -113,9 +113,16 @@ public final class NioEventLoop extends SingleThreadEventLoop {
      * The NIO {@link Selector}.
      */
     private Selector selector;
+
+    /**
+     * 原始的未经包装的Selector
+     */
     private Selector unwrappedSelector;
     private SelectedSelectionKeySet selectedKeys;
 
+    /**
+     * 用来选择具体的Selector的实现
+     */
     private final SelectorProvider provider;
 
     private static final long AWAKE = -1L;
@@ -127,21 +134,44 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     //    other value T    when EL is waiting with wakeup scheduled at time T
     private final AtomicLong nextWakeupNanos = new AtomicLong(AWAKE);
 
+    /**
+     * 用来控制select循环的行为，默认是DefaultSelectStrategy
+     */
     private final SelectStrategy selectStrategy;
 
     private volatile int ioRatio = 50;
     private int cancelledKeys;
     private boolean needsToSelectAgain;
 
+    /**
+     * 构造NioEventloop对象
+     * @param parent
+     * @param executor 如果NioEventLoopGroup不指定的话，默认是ThreadPerTaskExecutor
+     * @param selectorProvider 用来选择具体的Selector的实现，默认是SelectorPorvier.provider()
+     * @param strategy 用来控制select循环的行为，默认是DefaultSelectStrategy
+     * @param rejectedExecutionHandler 拒绝策略，默认是RejectedExecutionHandlers.reject()
+     * @param taskQueueFactory
+     * @param tailTaskQueueFactory
+     */
     NioEventLoop(NioEventLoopGroup parent, Executor executor, SelectorProvider selectorProvider,
                  SelectStrategy strategy, RejectedExecutionHandler rejectedExecutionHandler,
                  EventLoopTaskQueueFactory taskQueueFactory, EventLoopTaskQueueFactory tailTaskQueueFactory) {
+        /*
+            newTaskQueue中使用的是MPSC无锁队列
+         */
+        // TODO MPSC队列的逻辑未看
         super(parent, executor, false, newTaskQueue(taskQueueFactory), newTaskQueue(tailTaskQueueFactory),
                 rejectedExecutionHandler);
+        // 用来选择具体的Selector的实现
         this.provider = ObjectUtil.checkNotNull(selectorProvider, "selectorProvider");
+        // 用来控制select循环的行为
         this.selectStrategy = ObjectUtil.checkNotNull(strategy, "selectStrategy");
+        // 打开一个Selector，Java NIO中经常使用方式：selector = Selector.open()
+        // TODO openSelector的逻辑未看
         final SelectorTuple selectorTuple = openSelector();
+        // Selector
         this.selector = selectorTuple.selector;
+        // 原始的未经包装的Selector
         this.unwrappedSelector = selectorTuple.unwrappedSelector;
     }
 
@@ -154,7 +184,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     }
 
     private static final class SelectorTuple {
+        // 原始的未经包装的Selector
         final Selector unwrappedSelector;
+        // 默认也是原始的未经包装的Selector
         final Selector selector;
 
         SelectorTuple(Selector unwrappedSelector) {
@@ -168,9 +200,14 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
     }
 
+    /**
+     * 打开一个Selector，Java NIO中经常使用方式：selector = Selector.open()
+     * @return
+     */
     private SelectorTuple openSelector() {
         final Selector unwrappedSelector;
         try {
+            // 原始的未经包装过的Selector
             unwrappedSelector = provider.openSelector();
         } catch (IOException e) {
             throw new ChannelException("failed to open a new selector", e);

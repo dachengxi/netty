@@ -44,14 +44,98 @@ import java.util.concurrent.TimeUnit;
  */
 public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerChannel> {
 
+    /*
+        使用Netty的方式通常如下：
+        EventLoopGroup boss = new NioEventLoopGroup(1);
+        EventLoopGroup worker = new NioEventLoopGroup(X);
+
+        try {
+            ServerBootstrap server = new ServerBootstrap();
+            server.group(boss, worker)
+                    .channel(NioServerSocketChannel.class)
+                    .childHandler(new ChatServerInitializer())
+                    .option(ChannelOption.SO_BACKLOG, 128)
+                    .childOption(ChannelOption.SO_KEEPALIVE, true);
+
+            ChannelFuture future = server.bind(port).sync();
+            future.channel().closeFuture().sync();
+        }
+        // ...
+
+        NioEventLoopGroup在实例化的时候绑定了和NioEventLoop以及Selector的关系：
+        一个NioEventLoopGroup对应多个NioEventLoop，一个NioEventLoop和一个Selector绑定。
+
+        Boss EventLoopGroup和Worker EventLoopGroup不太一样，每个Boss EventLoopGroup中只包含一个
+        EventLoop，这个EventLoop对应一个Selector和一个TaskQueue，Boss的EventLoop会将连接的
+        Channel注册到Worker的EventLoop上。
+
+        Worker EventLoopGroup中会包含多个EventLoop，每个EventLoop对应一个Selector和TaskQueue，
+        Worker的EventLoop用来执行ChannelPipeline。
+
+        在使用Java NIO的时候，通常会使用以下的方式：
+        ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
+        serverSocketChannel.configureBlocking(false);
+        serverSocketChannel.bind(new InetSocketAddress("localhost", 9001));
+
+        selector = Selector.open();
+        serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
+
+        while (true) {
+            selector.select();
+            // ...
+        }
+        而在NioEventLoopGroup实例化的时候相当于执行了selector = Selector.open()这一步。
+
+        group方法：
+        ServerBootstrap的group(boss, worker)方法将boss NioEventLoopGroup和worker进行绑定，
+        boss对应Reactor的主线程，用来处理连接事件，worker对应Reactor的子线程，用来处理读写事件。
+
+        channel方法：
+        ServerBootstrap的channel(NioServerSocketChannel.class)方法创建一个NioServerSocketChanel
+        对应的ChannelFactory。
+
+        bind方法：
+        接下来是ServerBootstrap的bind(port)方法中在实例化我们指定的NioServerSocketChannel的时候
+        调用了provider.openServerSocketChannel()方法，这一步就相当于Java NIO使用的：
+        ServerSocketChannel serverSocketChannel = ServerSocketChannel.open()。
+
+        然后继续在NioServerSocketChannel的初始化逻辑中有：ch.configureBlocking(false)。接下来跟踪到
+        AbstractNioChannel的doRegister中有：selectionKey = javaChannel().register(eventLoop().unwrappedSelector(), 0, this)，
+        这里对应着Java NIO的serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT)。
+
+        在NioServerSocketChannel中有doBind方法，javaChannel().bind(localAddress, config.getBacklog())，
+        这里对应着Java NIO中的：serverSocketChannel.bind(new InetSocketAddress("localhost", 9001));
+
+        在NioEventLoop的run方法中有个for循环，对应着Java NIO的while(true) {selector.select()}。
+
+        ServerBootstrap的相关字段：
+        - EventLoopGroup group：Boss EventLoopGroup
+        - EventLoopGroup childGroup：Worker EventLoopGroup
+        - ChannelFactory<? extends C> channelFactory：用来根据指定的channel的class来通过反射生成SocketChannel的实例
+        - ChannelHandler childHandler：Channel处理器，用来处理客户端请求的Channel处理器
+        - Map<ChannelOption<?>, Object> options = new LinkedHashMap<ChannelOption<?>, Object>()：ServerBootstrap或者Bootstrap的一些选项
+        - Map<ChannelOption<?>, Object> childOptions = new LinkedHashMap<ChannelOption<?>, Object>()：ServerBootstrap中用来设置客户端SocketChannel的一些选项
+     */
+
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(ServerBootstrap.class);
 
     // The order in which child ChannelOptions are applied is important they may depend on each other for validation
     // purposes.
+    /**
+     * ServerBootstrap中用来设置客户端SocketChannel的一些选项
+     */
     private final Map<ChannelOption<?>, Object> childOptions = new LinkedHashMap<ChannelOption<?>, Object>();
     private final Map<AttributeKey<?>, Object> childAttrs = new ConcurrentHashMap<AttributeKey<?>, Object>();
     private final ServerBootstrapConfig config = new ServerBootstrapConfig(this);
+
+    /**
+     * Worker EventLoopGroup
+     */
     private volatile EventLoopGroup childGroup;
+
+    /**
+     * Channel处理器，用来处理客户端请求的Channel处理器
+     */
     private volatile ChannelHandler childHandler;
 
     public ServerBootstrap() { }
@@ -78,6 +162,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
      * Set the {@link EventLoopGroup} for the parent (acceptor) and the child (client). These
      * {@link EventLoopGroup}'s are used to handle all the events and IO for {@link ServerChannel} and
      * {@link Channel}'s.
+     * 设置Boss EventLoopGroup和Worker EventLoopGroup
      */
     public ServerBootstrap group(EventLoopGroup parentGroup, EventLoopGroup childGroup) {
         super.group(parentGroup);
@@ -92,6 +177,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
      * Allow to specify a {@link ChannelOption} which is used for the {@link Channel} instances once they get created
      * (after the acceptor accepted the {@link Channel}). Use a value of {@code null} to remove a previous set
      * {@link ChannelOption}.
+     * ServerBootstrap中用来设置客户端SocketChannel的一些选项
      */
     public <T> ServerBootstrap childOption(ChannelOption<T> childOption, T value) {
         ObjectUtil.checkNotNull(childOption, "childOption");
@@ -121,6 +207,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
 
     /**
      * Set the {@link ChannelHandler} which is used to serve the request for the {@link Channel}'s.
+     * 设置Channel处理器，用来处理客户端请求的Channel处理器
      */
     public ServerBootstrap childHandler(ChannelHandler childHandler) {
         this.childHandler = ObjectUtil.checkNotNull(childHandler, "childHandler");

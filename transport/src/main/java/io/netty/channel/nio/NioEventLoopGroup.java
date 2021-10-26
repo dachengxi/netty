@@ -42,12 +42,59 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
         NioEventLoopGroup可认为是一个带有Schedule类型的线程池。
 
         在使用的时候一般是如下的方式：
-        EventLoopGroup boss = new NioEventLoopGroup();
-        EventLoopGroup worker = new NioEventLoopGroup();
+        EventLoopGroup boss = new NioEventLoopGroup(1);
+        EventLoopGroup worker = new NioEventLoopGroup(X);
+        一般在实例化boss这个group的时候，会指定线程数这个参数为1，worker的线程数参数根据实际情况填写。
+        如果没有指定线程数参数，默认是NettyRuntime.availableProcessors() * 2。
 
         boss对应Reactor的主线程，用来处理连接事件，worker对应Reactor的子线程，用来处理读写事件。
 
+        NioEventLoopGroup在实例化的时候主要工作是，使用指定的线程数来实例化对应的NioEventLoop，
+        也即是在一个NioEventLoopGroup内部包含了N个NioEventLoop。在NioEventLoop实例化的时候，
+        会进行Java NIO的Selector的open操作，也就是每个NioEventLoop会和一个Selector进行绑定。
 
+        Boss EventLoopGroup和Worker EventLoopGroup不太一样，每个Boss EventLoopGroup中只包含一个
+        EventLoop，这个EventLoop对应一个Selector和一个TaskQueue，Boss的EventLoop会将连接的
+        Channel注册到Worker的EventLoop上。
+
+        Worker EventLoopGroup中会包含多个EventLoop，每个EventLoop对应一个Selector和TaskQueue，
+        Worker的EventLoop用来执行ChannelPipeline。
+
+        在使用Java NIO的时候，通常会使用以下的方式：
+        ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
+        serverSocketChannel.configureBlocking(false);
+        serverSocketChannel.bind(new InetSocketAddress("localhost", 9001));
+
+        selector = Selector.open();
+        serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
+
+        while (true) {
+            selector.select();
+            // ...
+        }
+
+        NioEventLoopGroup在实例化的时候就相当于执行了selector = Selector.open()这一步。
+
+        NioEventLoopGroup的相关字段：
+
+        - EventExecutor[] children：用来存放EventLoopGroup对应的EventLoop
+        - EventExecutorChooserFactory.EventExecutorChooser chooser：Boss和Worker EventLoopGroup中都有可能有多个EventLoop，chooser用来选择使用哪个EventLoop来处理请求
+        - AtomicInteger terminatedChildren = new AtomicInteger()：已经停止工作的EventLoop的个数
+
+        NioEventLoop的相关字段：
+
+        - SelectorProvider provider：用来选择具体的Selector的实现，默认是SelectorPorvier.provider()
+        - SelectStrategy selectStrategy：用来控制select循环的行为，默认是DefaultSelectStrategy
+        - Selector selector：Selector
+        - Selector unwrappedSelector：原始的未经包装的Selector
+        - Queue<Runnable> taskQueue：
+        - Queue<Runnable> tailTasks：
+        - Executor executor：如果NioEventLoopGroup不指定的话，默认是ThreadPerTaskExecutor
+        - RejectedExecutionHandler rejectedExecutionHandler：拒绝策略，默认是RejectedExecutionHandlers.reject()
+        - EventExecutorGroup parent：当前EventLoop所属的EventLoopGroup
+
+        Netty4的线程模型有变化，提交到EventLoop的任务会被线程无锁串行化执行，EventLoop的任务队列的的使用场景就变成了：
+        多个生产者，单个消费者。使用的是MPSC无锁队列实现任务队列。
      */
 
     /**
@@ -177,10 +224,20 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
         }
     }
 
+    /**
+     * NioEventLoopGroup用来创建NioEventLoop的方法
+     * @param executor，如果NioEventLoopGroup不指定的话，默认是ThreadPerTaskExecutor
+     * @param args
+     * @return
+     * @throws Exception
+     */
     @Override
     protected EventLoop newChild(Executor executor, Object... args) throws Exception {
+        // 用来选择具体的Selector的实现
         SelectorProvider selectorProvider = (SelectorProvider) args[0];
+        // 用来控制select循环的行为
         SelectStrategyFactory selectStrategyFactory = (SelectStrategyFactory) args[1];
+        // 拒绝策略，默认是RejectedExecutionHandlers.reject()
         RejectedExecutionHandler rejectedExecutionHandler = (RejectedExecutionHandler) args[2];
         EventLoopTaskQueueFactory taskQueueFactory = null;
         EventLoopTaskQueueFactory tailTaskQueueFactory = null;
@@ -192,6 +249,7 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
         if (argsLength > 4) {
             tailTaskQueueFactory = (EventLoopTaskQueueFactory) args[4];
         }
+        // 实例化一个NioEventLoop对象
         return new NioEventLoop(this, executor, selectorProvider,
                 selectStrategyFactory.newSelectStrategy(),
                 rejectedExecutionHandler, taskQueueFactory, tailTaskQueueFactory);
