@@ -44,9 +44,24 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(AbstractChannel.class);
 
+    /**
+     * Channel的父Channel，ServerSocketChannel没有父Channel
+     */
     private final Channel parent;
+
+    /**
+     * Channel的唯一标识ID，默认是DefaultChannelId实例
+     */
     private final ChannelId id;
+
+    /**
+     * Netty内部使用的接口
+     */
     private final Unsafe unsafe;
+
+    /**
+     * pipeline，默认实现是DefaultChannelPipeline
+     */
     private final DefaultChannelPipeline pipeline;
     private final VoidChannelPromise unsafeVoidPromise = new VoidChannelPromise(this, false);
     private final CloseFuture closeFuture = new CloseFuture(this);
@@ -69,9 +84,13 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
      *        the parent of this channel. {@code null} if there's no parent.
      */
     protected AbstractChannel(Channel parent) {
+        // Channel的父Channel
         this.parent = parent;
+        // Channel的唯一标识ID，默认是DefaultChannelId
         id = newId();
+        // Netty内部使用的接口，newUnsafe由Channel具体子类来实现
         unsafe = newUnsafe();
+        // pipeline，默认实现DefaultChannelPipeline
         pipeline = newChannelPipeline();
     }
 

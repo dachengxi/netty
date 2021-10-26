@@ -283,6 +283,13 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     }
 
     private ChannelFuture doBind(final SocketAddress localAddress) {
+        /*
+            initAndRegister方法中主要完成以下功能：
+            - 实例化Channel
+            - 初始化Channel
+            - 打开Channel
+            - 注册Channel到Selector上
+         */
         final ChannelFuture regFuture = initAndRegister();
         final Channel channel = regFuture.channel();
         if (regFuture.cause() != null) {
@@ -321,7 +328,17 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     final ChannelFuture initAndRegister() {
         Channel channel = null;
         try {
+            /*
+                使用ReflectiveChannelFactory实例化一个Channel。
+
+                NioServerSocketChannel在构造方法中做了以下事情：
+                - 直接使用NIO的SelectorProvider打开ServerSocketChannel
+                - 默认会实例化一个DefaultChannelPipeline
+                - 实例化一个Channel的唯一标识ID，默认是DefaultChannelId
+                - 实例化一个Netty内部使用的接口对象，是NioMessageUnsafe
+             */
             channel = channelFactory.newChannel();
+            // 初始化Channel，具体子类ServerBootstrap或者Bootstrap实现
             init(channel);
         } catch (Throwable t) {
             if (channel != null) {
@@ -334,6 +351,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
             return new DefaultChannelPromise(new FailedChannel(), GlobalEventExecutor.INSTANCE).setFailure(t);
         }
 
+        // 这里面会将Channel注册到Selector上
         ChannelFuture regFuture = config().group().register(channel);
         if (regFuture.cause() != null) {
             if (channel.isRegistered()) {

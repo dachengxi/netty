@@ -45,6 +45,23 @@ import java.util.Map;
  */
 public class NioServerSocketChannel extends AbstractNioMessageChannel
                              implements io.netty.channel.socket.ServerSocketChannel {
+    /*
+        Netty自己实现的服务端用的SocketChannel，使用NIO的Selector来接收新的连接。
+        NioServerSocketChannel在构造方法中做了以下事情：
+        - 直接使用NIO的SelectorProvider打开ServerSocketChannel
+        - 默认会实例化一个DefaultChannelPipeline
+        - 实例化一个Channel的唯一标识ID，默认是DefaultChannelId
+        - 实例化一个Netty内部使用的接口对象，是NioMessageUnsafe
+
+        NioServerSocketChannel的相关字段：
+        - Channel parent：null，NioServerSocketChannel没有父Channel
+        - ChannelId id：Channel的唯一标识ID，默认是DefaultChannelId实例
+        - Unsafe unsafe：Netty内部使用的接口
+        - DefaultChannelPipeline pipeline：pipeline，默认实现是DefaultChannelPipeline
+        - SelectableChannel ch：使用NIO的SelectorProvider打开ServerSocketChannel
+        - int readInterestOp：这里是SelectionKey.OP_ACCEPT
+        - ServerSocketChannelConfig config：ServerSocketChannel的配置类，默认是NioServerSocketChannelConfig实例
+     */
 
     private static final ChannelMetadata METADATA = new ChannelMetadata(false, 16);
     private static final SelectorProvider DEFAULT_SELECTOR_PROVIDER = SelectorProvider.provider();
@@ -58,6 +75,7 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
              *  {@link SelectorProvider#provider()} which is called by each ServerSocketChannel.open() otherwise.
              *
              *  See <a href="https://github.com/netty/netty/issues/2308">#2308</a>.
+             *  直接使用NIO的SelectorProvider打开ServerSocketChannel
              */
             return provider.openServerSocketChannel();
         } catch (IOException e) {
@@ -66,12 +84,16 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
         }
     }
 
+    /**
+     * ServerSocketChannel的配置类，默认是NioServerSocketChannelConfig实例
+     */
     private final ServerSocketChannelConfig config;
 
     /**
      * Create a new instance
      */
     public NioServerSocketChannel() {
+        // 直接使用NIO的SelectorProvider打开ServerSocketChannel
         this(newSocket(DEFAULT_SELECTOR_PROVIDER));
     }
 
@@ -79,6 +101,7 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
      * Create a new instance using the given {@link SelectorProvider}.
      */
     public NioServerSocketChannel(SelectorProvider provider) {
+        // 直接使用NIO的SelectorProvider打开ServerSocketChannel
         this(newSocket(provider));
     }
 

@@ -45,6 +45,16 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
  */
 public class DefaultChannelPipeline implements ChannelPipeline {
 
+    /*
+        DefaultChannelPipeline是ChannelPipeline的默认实现，在Channel实例化的时候被创建。
+        DefaultChannelPipeline的相关字段：
+        - Channel channel：Pipeline所属的Channel
+        - ChannelFuture succeededFuture
+        - VoidChannelPromise voidPromise
+        - AbstractChannelHandlerContext head：HeadContext
+        - AbstractChannelHandlerContext tail：TailContext
+     */
+
     static final InternalLogger logger = InternalLoggerFactory.getInstance(DefaultChannelPipeline.class);
 
     private static final String HEAD_NAME = generateName0(HeadContext.class);
@@ -64,6 +74,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     final AbstractChannelHandlerContext head;
     final AbstractChannelHandlerContext tail;
 
+    /**
+     * Pipeline所属的Channel
+     */
     private final Channel channel;
     private final ChannelFuture succeededFuture;
     private final VoidChannelPromise voidPromise;
@@ -90,6 +103,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     private boolean registered;
 
     protected DefaultChannelPipeline(Channel channel) {
+        // Pipeline所属的Channel
         this.channel = ObjectUtil.checkNotNull(channel, "channel");
         succeededFuture = new SucceededChannelFuture(channel, null);
         voidPromise =  new VoidChannelPromise(channel, true);

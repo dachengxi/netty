@@ -214,16 +214,27 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         return this;
     }
 
+    /**
+     * 初始化ServerSocketChannel
+     * @param channel
+     */
     @Override
     void init(Channel channel) {
+        // 设置Channel的选项
         setChannelOptions(channel, newOptionsArray(), logger);
+        // 设置Channel的属性
         setAttributes(channel, newAttributesArray());
 
+        // NioServerSocketChannel在实例化的时候默认会实例化一个DefaultChannelPipeline
         ChannelPipeline p = channel.pipeline();
 
+        // Worker EventLoopGroup
         final EventLoopGroup currentChildGroup = childGroup;
+        // Channel处理器，用来处理客户端请求的Channel处理器
         final ChannelHandler currentChildHandler = childHandler;
+        // ServerBootstrap中用来设置客户端SocketChannel的一些选项
         final Entry<ChannelOption<?>, Object>[] currentChildOptions = newOptionsArray(childOptions);
+        // ServerBootstrap中用来设置客户端SocketChannel的一些属性
         final Entry<AttributeKey<?>, Object>[] currentChildAttrs = newAttributesArray(childAttrs);
 
         p.addLast(new ChannelInitializer<Channel>() {

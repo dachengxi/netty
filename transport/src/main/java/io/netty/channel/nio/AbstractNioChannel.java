@@ -50,7 +50,14 @@ public abstract class AbstractNioChannel extends AbstractChannel {
     private static final InternalLogger logger =
             InternalLoggerFactory.getInstance(AbstractNioChannel.class);
 
+    /**
+     * 如果是NioServerSocketChannel，则这里ch为使用NIO的SelectorProvider打开ServerSocketChannel
+     */
     private final SelectableChannel ch;
+
+    /**
+     * 如果是NioServerSocketChannel，则这里是SelectionKey.OP_ACCEPT
+     */
     protected final int readInterestOp;
     volatile SelectionKey selectionKey;
     boolean readPending;
@@ -77,10 +84,14 @@ public abstract class AbstractNioChannel extends AbstractChannel {
      * @param readInterestOp    the ops to set to receive data from the {@link SelectableChannel}
      */
     protected AbstractNioChannel(Channel parent, SelectableChannel ch, int readInterestOp) {
+        // 父类中默认会实例化一个DefaultChannelPipeline
         super(parent);
+        // 如果是NioServerSocketChannel，则这里ch为使用NIO的SelectorProvider打开ServerSocketChannel
         this.ch = ch;
+        // 如果是NioServerSocketChannel，则这里是SelectionKey.OP_ACCEPT
         this.readInterestOp = readInterestOp;
         try {
+            // Channel设置为非阻塞
             ch.configureBlocking(false);
         } catch (IOException e) {
             try {
