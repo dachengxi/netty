@@ -85,10 +85,10 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
 
         - SelectorProvider provider：用来选择具体的Selector的实现，默认是SelectorPorvier.provider()
         - SelectStrategy selectStrategy：用来控制select循环的行为，默认是DefaultSelectStrategy
-        - Selector selector：Selector
+        - Selector selector：Selector，可能是经过优化后包装的SelectedSelectionKeySetSelector
         - Selector unwrappedSelector：原始的未经包装的Selector
-        - Queue<Runnable> taskQueue：
-        - Queue<Runnable> tailTasks：
+        - Queue<Runnable> taskQueue：用于存储任务的队列
+        - Queue<Runnable> tailTasks：用于存储EventLoop事件循环结束后需要执行的任务
         - Executor executor：如果NioEventLoopGroup不指定的话，默认是ThreadPerTaskExecutor
         - RejectedExecutionHandler rejectedExecutionHandler：拒绝策略，默认是RejectedExecutionHandlers.reject()
         - EventExecutorGroup parent：当前EventLoop所属的EventLoopGroup

@@ -35,6 +35,9 @@ public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor im
     protected static final int DEFAULT_MAX_PENDING_TASKS = Math.max(16,
             SystemPropertyUtil.getInt("io.netty.eventLoop.maxPendingTasks", Integer.MAX_VALUE));
 
+    /**
+     * 用于存储EventLoop事件循环结束后需要执行的任务
+     */
     private final Queue<Runnable> tailTasks;
 
     protected SingleThreadEventLoop(EventLoopGroup parent, ThreadFactory threadFactory, boolean addTaskWakesUp) {
@@ -64,14 +67,15 @@ public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor im
      * @param parent EventLoopGroup
      * @param executor 如果NioEventLoopGroup不指定的话，默认是ThreadPerTaskExecutor
      * @param addTaskWakesUp
-     * @param taskQueue
-     * @param tailTaskQueue
+     * @param taskQueue 用于存储任务的队列
+     * @param tailTaskQueue 用于存储EventLoop事件循环结束后需要执行的任务
      * @param rejectedExecutionHandler 拒绝策略，默认是RejectedExecutionHandlers.reject()
      */
     protected SingleThreadEventLoop(EventLoopGroup parent, Executor executor,
                                     boolean addTaskWakesUp, Queue<Runnable> taskQueue, Queue<Runnable> tailTaskQueue,
                                     RejectedExecutionHandler rejectedExecutionHandler) {
         super(parent, executor, addTaskWakesUp, taskQueue, rejectedExecutionHandler);
+        // 用于存储EventLoop事件循环结束后需要执行的任务
         tailTasks = ObjectUtil.checkNotNull(tailTaskQueue, "tailTaskQueue");
     }
 
@@ -87,12 +91,21 @@ public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor im
 
     @Override
     public ChannelFuture register(Channel channel) {
+        /*
+            EventLoop将Channel注册到Selector上。
+            使用DefaultChannelPromise将Channel和当前的EventLoop进行封装，
+         */
         return register(new DefaultChannelPromise(channel, this));
     }
 
     @Override
     public ChannelFuture register(final ChannelPromise promise) {
         ObjectUtil.checkNotNull(promise, "promise");
+        /*
+            ChannelPromise中包含Channel和当前的EventLoop，假如Channel是
+            NioServerSocketChannel的话，则NioServerSocketChannel在实例化的时候创建了一个
+            unsafe对象NioMessageUnsafe，所以这里的unsafe()放大得到的对象是NioMessageUnsafe。
+         */
         promise.channel().unsafe().register(this, promise);
         return promise;
     }

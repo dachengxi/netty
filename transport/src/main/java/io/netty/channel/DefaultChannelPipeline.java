@@ -215,13 +215,23 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         synchronized (this) {
             checkMultiplicity(handler);
 
+            // 封装成DefaultChannelHandlerContext
             newCtx = newContext(group, filterName(name, handler), handler);
 
+            // 添加到Pipeline中
             addLast0(newCtx);
 
             // If the registered is false it means that the channel was not registered on an eventLoop yet.
             // In this case we add the context to the pipeline and add a task that will call
             // ChannelHandler.handlerAdded(...) once the channel is registered.
+            /*
+                如果还在Channel的初始化和Register的时候，Channel和EventLoop还没绑定，
+                需要添加一个PendingHandlerAddedTask任务到当前Pipeline中，后面在Channel进行
+                注册到Selector的步骤中如果发现有PendingHandlerAddedTask任务，则会调用
+                Pipeline中的Handler的handlerAdded方法，其中ChannelInitializer中的handlerAdded
+                方法会将ChannelInitializer中的Handler添加到Pipeline中，并将ChannelInitializer
+                自己移除掉
+             */
             if (!registered) {
                 newCtx.setAddPending();
                 callHandlerCallbackLater(newCtx, true);

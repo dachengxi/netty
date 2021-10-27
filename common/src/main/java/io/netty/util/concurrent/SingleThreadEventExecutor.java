@@ -74,6 +74,9 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             AtomicReferenceFieldUpdater.newUpdater(
                     SingleThreadEventExecutor.class, ThreadProperties.class, "threadProperties");
 
+    /**
+     * 用于存储任务的队列
+     */
     private final Queue<Runnable> taskQueue;
 
     private volatile Thread thread;
@@ -98,6 +101,9 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     private long lastExecutionTime;
 
+    /**
+     * EventLoop绑定的线程的状态
+     */
     @SuppressWarnings({ "FieldMayBeFinal", "unused" })
     private volatile int state = ST_NOT_STARTED;
 
@@ -174,7 +180,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
      * @param parent EventLoopGroup
      * @param executor 如果NioEventLoopGroup不指定的话，默认是ThreadPerTaskExecutor
      * @param addTaskWakesUp
-     * @param taskQueue
+     * @param taskQueue 用于存储任务的队列
      * @param rejectedHandler 拒绝策略，默认是RejectedExecutionHandlers.reject()
      */
     protected SingleThreadEventExecutor(EventExecutorGroup parent, Executor executor,
@@ -839,9 +845,12 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     }
 
     private void execute(Runnable task, boolean immediate) {
+        // 当前线程是不是和EventLoop绑定的线程是同一个线程，第一次进来的时候不是
         boolean inEventLoop = inEventLoop();
+        // 将任务放到workQueue中
         addTask(task);
         if (!inEventLoop) {
+            // 这里面创建EventLoop中绑定的新线程，并启动这个新线程，线程中会对taskQueue开始处理
             startThread();
             if (isShutdown()) {
                 boolean reject = false;
@@ -955,10 +964,13 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     private static final long SCHEDULE_PURGE_INTERVAL = TimeUnit.SECONDS.toNanos(1);
 
     private void startThread() {
+        // 线程状态为ST_NOT_STARTED的时候才开启线程
         if (state == ST_NOT_STARTED) {
+            // cas更新状态为ST_STARTED
             if (STATE_UPDATER.compareAndSet(this, ST_NOT_STARTED, ST_STARTED)) {
                 boolean success = false;
                 try {
+                    // 启动线程
                     doStartThread();
                     success = true;
                 } finally {
@@ -990,9 +1002,15 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     private void doStartThread() {
         assert thread == null;
+        /*
+            默认是ThreadPerTaskExecutor，新建一个任务提交到EventLoop的线程池中。
+            ThreadPerTaskExecutor中直接创建一个线程并启动线程，创建的这个线程也
+            就是当前EventLoop对应的线程
+         */
         executor.execute(new Runnable() {
             @Override
             public void run() {
+                // 线程和当前EventLoop绑定
                 thread = Thread.currentThread();
                 if (interrupted) {
                     thread.interrupt();
@@ -1001,6 +1019,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                 boolean success = false;
                 updateLastExecutionTime();
                 try {
+                    // 执行当前EventLoop的run方法，这里面会启动对taskQueue队列的处理
                     SingleThreadEventExecutor.this.run();
                     success = true;
                 } catch (Throwable t) {

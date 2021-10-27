@@ -126,6 +126,10 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
      */
     private final Map<ChannelOption<?>, Object> childOptions = new LinkedHashMap<ChannelOption<?>, Object>();
     private final Map<AttributeKey<?>, Object> childAttrs = new ConcurrentHashMap<AttributeKey<?>, Object>();
+
+    /**
+     * 包装了一下ServerBootstrap，暴漏的一些方法都是对ServerBootstrap的方法的直接调用
+     */
     private final ServerBootstrapConfig config = new ServerBootstrapConfig(this);
 
     /**
@@ -237,6 +241,17 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         // ServerBootstrap中用来设置客户端SocketChannel的一些属性
         final Entry<AttributeKey<?>, Object>[] currentChildAttrs = newAttributesArray(childAttrs);
 
+        /*
+            在Pipeline中添加一个handler：ChannelInitializer，此时pipeline中类似如下：
+            head <----> channelInitializer <----> tail
+            pipeline中并没有ChannelHandler，而是一个ChannelInitializer对象，后续的
+            register方法中会触发ChannelInitializer的initChannel方法的调用，调用后
+            会把initChannel方法中的ChannelHandler添加到pipeline中，并同时把当前的
+            ChannelInitializer从pipeline中删除掉.
+
+            DefaultChannelPipeline的addLast除了会将这个ChannelInitializer加入到pipeline中，
+            还会有其他的操作
+         */
         p.addLast(new ChannelInitializer<Channel>() {
             @Override
             public void initChannel(final Channel ch) {
@@ -249,6 +264,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
                 ch.eventLoop().execute(new Runnable() {
                     @Override
                     public void run() {
+                        // 在Pipeline中添加一个负责接收新连接的handler：ServerBootstrapAcceptor
                         pipeline.addLast(new ServerBootstrapAcceptor(
                                 ch, currentChildGroup, currentChildHandler, currentChildOptions, currentChildAttrs));
                     }

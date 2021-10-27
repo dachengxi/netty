@@ -61,6 +61,7 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
         - SelectableChannel ch：使用NIO的SelectorProvider打开ServerSocketChannel
         - int readInterestOp：这里是SelectionKey.OP_ACCEPT
         - ServerSocketChannelConfig config：ServerSocketChannel的配置类，默认是NioServerSocketChannelConfig实例
+        - EventLoop eventLoop：和当前Channel对应的EventLoop
      */
 
     private static final ChannelMetadata METADATA = new ChannelMetadata(false, 16);

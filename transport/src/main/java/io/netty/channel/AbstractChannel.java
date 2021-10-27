@@ -68,6 +68,10 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
     private volatile SocketAddress localAddress;
     private volatile SocketAddress remoteAddress;
+
+    /**
+     * 和Channel对应的EventLoop
+     */
     private volatile EventLoop eventLoop;
     private volatile boolean registered;
     private boolean closeInitiated;
@@ -493,15 +497,27 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // 将当前的EventLoop和Channel绑定，以后Channel中的操作都由当前EventLoop进行处理
             AbstractChannel.this.eventLoop = eventLoop;
 
+            // 当前线程是不是和EventLoop绑定的线程是同一个线程，这里有可能是unRegister之后再进行register的时候触发
             if (eventLoop.inEventLoop()) {
                 register0(promise);
-            } else {
+            }
+            // 当前线程和EventLoop绑定的线程不是同一个线程，第一次进来的时候肯定不是同一个
+            else {
                 try {
+                    /*
+                        假设是NioEventLoop，此时的NioEventLoop中的线程还没有实例化，
+                        在execute方法中会往taskQueue中提交一个任务到taskQueue，并且创建一个新线程，
+                        新线程会和EventLoop绑定，启动新线程后会对taskQueue进行处理，这样就可以执行register0这个任务了。
+
+                     */
                     eventLoop.execute(new Runnable() {
                         @Override
                         public void run() {
+                            // 和EventLoop绑定的新线程创建启动后开始处理taskQueue中的任务，就会执行这里了
+                            // 这里面会将Channel注册到Selector中去
                             register0(promise);
                         }
                     });
@@ -524,15 +540,27 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                     return;
                 }
                 boolean firstRegistration = neverRegistered;
+                // 这里使用Java NIO的方式将Channel注册到Selector上
                 doRegister();
                 neverRegistered = false;
                 registered = true;
 
                 // Ensure we call handlerAdded(...) before we actually notify the promise. This is needed as the
                 // user may already fire events through the pipeline in the ChannelFutureListener.
+                /*
+                    pipeline在NioServerSocketChannel实例化的时候默认是DefaultChannelPipeline，
+                    并且在初始化Channel的时候，pipeline中已经添加了一个ChannelInitializer，在添加
+                    ChannelInitializer的时候，同时也向Pipeline中添加了PendingHandlerAddedTask，
+                    所以这里会调用PendingHandlerAddedTask的方法，用来调用ChannelInitializer的
+                    channelAdded方法，将ChannelInitializer中initChannel中的方法中的Handler添加
+                    到Pipeline中，并将ChannelInitializer从Pipeline中移除掉。
+
+                    这里就会将在Channel初始化的时候的ServerBootstrapAcceptor添加到Pipeline中。
+                 */
                 pipeline.invokeHandlerAddedIfNeeded();
 
                 safeSetSuccess(promise);
+                // 触发当前pipeline中的Handler的Channel已注册事件
                 pipeline.fireChannelRegistered();
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
                 // multiple channel actives if the channel is deregistered and re-registered.

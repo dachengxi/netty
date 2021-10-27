@@ -299,6 +299,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         if (regFuture.isDone()) {
             // At this point we know that the registration was complete and successful.
             ChannelPromise promise = channel.newPromise();
+            // 开始进行bind操作
             doBind0(regFuture, channel, localAddress, promise);
             return promise;
         } else {
@@ -317,6 +318,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
                         // See https://github.com/netty/netty/issues/2586
                         promise.registered();
 
+                        // 开始进行bind操作
                         doBind0(regFuture, channel, localAddress, promise);
                     }
                 }
@@ -325,6 +327,13 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         }
     }
 
+    /*
+        initAndRegister方法中主要完成以下功能：
+        - 实例化Channel
+        - 初始化Channel
+        - 打开Channel
+        - 注册Channel到Selector上
+     */
     final ChannelFuture initAndRegister() {
         Channel channel = null;
         try {
@@ -338,7 +347,12 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
                 - 实例化一个Netty内部使用的接口对象，是NioMessageUnsafe
              */
             channel = channelFactory.newChannel();
-            // 初始化Channel，具体子类ServerBootstrap或者Bootstrap实现
+            /*
+                初始化Channel，具体子类ServerBootstrap或者Bootstrap实现
+                在ServerBootstrap初始化Channel的时候，会在其pipeline中添加一个ChannelInitializer，
+                这个ChannelInitializer的initChannel方法会在后面的register方法中被调用，调用后会向
+                pipeline中添加一个ServerBootstrapAcceptor，这个Acceptor是用来接收新连接的Handler。
+             */
             init(channel);
         } catch (Throwable t) {
             if (channel != null) {
@@ -351,7 +365,10 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
             return new DefaultChannelPromise(new FailedChannel(), GlobalEventExecutor.INSTANCE).setFailure(t);
         }
 
-        // 这里面会将Channel注册到Selector上
+        /*
+            这里面会将Channel注册到Selector上
+            group是Boss EventLoopGroup，比如：NioEventLoopGroup
+         */
         ChannelFuture regFuture = config().group().register(channel);
         if (regFuture.cause() != null) {
             if (channel.isRegistered()) {
@@ -370,6 +387,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         //         because bind() or connect() will be executed *after* the scheduled registration task is executed
         //         because register(), bind(), and connect() are all bound to the same thread.
 
+        // 走到这里，说明可以继续进行bind()或者connect()操作了
         return regFuture;
     }
 

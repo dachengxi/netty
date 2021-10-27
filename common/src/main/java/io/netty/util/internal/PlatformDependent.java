@@ -949,7 +949,13 @@ public final class PlatformDependent {
             P：Producer，生产者
             S：Single，单个的
             C：Consumer，消费者
-            MPSC队列是一个适用于多个生产者单个消费者的高性能无锁队列
+            MPSC队列是一个适用于多个生产者单个消费者的高性能无锁队列。
+
+            Netty4的线程模型决定了taskQueue的生产者可以有多个，但是taskQueue的消费者
+            只有它所在的EventLoop中的线程来消费，而一个EventLoop中只对应一个线程，所以
+            消费者是单线程的。
+
+            MPSC使用无锁方式保证多个生产者访问队列的安全性。
          */
         private static final boolean USE_MPSC_CHUNKED_ARRAY_QUEUE;
 
