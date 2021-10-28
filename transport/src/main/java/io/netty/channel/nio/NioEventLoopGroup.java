@@ -92,6 +92,7 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
         - Executor executor：如果NioEventLoopGroup不指定的话，默认是ThreadPerTaskExecutor
         - RejectedExecutionHandler rejectedExecutionHandler：拒绝策略，默认是RejectedExecutionHandlers.reject()
         - EventExecutorGroup parent：当前EventLoop所属的EventLoopGroup
+        - SelectedSelectionKeySet selectedKeys：selectedKeys是Netty优化SelectorImpl的selectedKeys和publicSelectedKeys字段的替代者，selectedKeys中保存了selectedKeys和publicSelectedKeys字段的值
 
         Netty4的线程模型有变化，提交到EventLoop的任务会被线程无锁串行化执行，EventLoop的任务队列的的使用场景就变成了：
         多个生产者，单个消费者。使用的是MPSC无锁队列实现任务队列。

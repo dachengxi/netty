@@ -540,7 +540,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                     return;
                 }
                 boolean firstRegistration = neverRegistered;
-                // 这里使用Java NIO的方式将Channel注册到Selector上
+                // 这里使用Java NIO的方式将Channel注册到Selector上，但是这里面没有注册感兴趣的事件，ops=0
                 doRegister();
                 neverRegistered = false;
                 registered = true;

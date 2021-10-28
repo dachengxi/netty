@@ -101,7 +101,10 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
 
         然后继续在NioServerSocketChannel的初始化逻辑中有：ch.configureBlocking(false)。接下来跟踪到
         AbstractNioChannel的doRegister中有：selectionKey = javaChannel().register(eventLoop().unwrappedSelector(), 0, this)，
-        这里对应着Java NIO的serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT)。
+        这里对应着Java NIO的serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT)。但是
+        这里没有注册感兴趣的事件，ops=0，下面会在bind之后，触发channelActive事件，最后会在Pipeline的read方法中
+        调用doBeginRead方法来进行OP_ACCEPT事件的注册：selectionKey.interestOps(interestOps | readInterestOp)，
+        这个readInterestOp是NioServerSocketChannel构造方法中指定的：SelectionKey.OP_ACCEPT。
 
         在NioServerSocketChannel中有doBind方法，javaChannel().bind(localAddress, config.getBacklog())，
         这里对应着Java NIO中的：serverSocketChannel.bind(new InetSocketAddress("localhost", 9001));
