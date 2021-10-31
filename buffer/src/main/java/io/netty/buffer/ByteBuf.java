@@ -246,6 +246,26 @@ import java.nio.charset.UnsupportedCharsetException;
  * {@link ByteBufOutputStream}.
  */
 public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
+    /*
+        Java的ByteBuffer分配的长度是固定的，无法动态扩容和缩容；读写状态的切换麻烦。
+
+        Netty的ByteBuf支持动态扩容。
+
+        - readerIndex读指针
+        - writerIndex写指针
+        - maxCapacity最大容量
+
+        ByteBuf实现了ReferenceCounted接口，基于引用计数来管理ByteBuf的生命周期，引用计数为0的时候，
+        说明当前ByteBuf不再被引用，可以释放掉。
+
+        ByteBuf有多种实现：
+        - Heap，是在JVM堆内分配内存
+        - Direct，是在堆外分配内存
+        - Pooled，将内存池化
+        - Unpooled，直接调用系统API申请内存
+        - Unsafe，依赖JDK的Unsafe来操作内存
+        - 非Unsafe，则使用数组下表方式操作数据
+     */
 
     /**
      * Returns the number of bytes (octets) this buffer can contain.
@@ -322,6 +342,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
 
     /**
      * Returns the {@code readerIndex} of this buffer.
+     * 返回当前读指针的位置
      */
     public abstract int readerIndex();
 
@@ -332,11 +353,13 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      *         if the specified {@code readerIndex} is
      *            less than {@code 0} or
      *            greater than {@code this.writerIndex}
+     * 设置读指针的位置
      */
     public abstract ByteBuf readerIndex(int readerIndex);
 
     /**
      * Returns the {@code writerIndex} of this buffer.
+     * 返回当前写指针的位置
      */
     public abstract int writerIndex();
 
@@ -347,6 +370,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      *         if the specified {@code writerIndex} is
      *            less than {@code this.readerIndex} or
      *            greater than {@code this.capacity}
+     * 设置写指针的位置
      */
     public abstract ByteBuf writerIndex(int writerIndex);
 
@@ -406,6 +430,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Returns the number of readable bytes which is equal to
      * {@code (this.writerIndex - this.readerIndex)}.
+     * 返回可读取的字节数：写指针减去读指针
      */
     public abstract int readableBytes();
 
@@ -434,11 +459,13 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Returns {@code true}
      * if and only if {@code (this.writerIndex - this.readerIndex)} is greater
      * than {@code 0}.
+     * 判断是否可读，写指针减去读指针如果大于0，说明是可读的
      */
     public abstract boolean isReadable();
 
     /**
      * Returns {@code true} if and only if this buffer contains equal to or more than the specified number of elements.
+     * 判断是否可读指定的大小
      */
     public abstract boolean isReadable(int size);
 
@@ -471,6 +498,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * reposition the current {@code readerIndex} to the marked
      * {@code readerIndex} by calling {@link #resetReaderIndex()}.
      * The initial value of the marked {@code readerIndex} is {@code 0}.
+     * 标记读指针位置，可使用resetReaderIndex方法将读指针恢复到标记的读指针位置
      */
     public abstract ByteBuf markReaderIndex();
 
@@ -481,6 +509,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * @throws IndexOutOfBoundsException
      *         if the current {@code writerIndex} is less than the marked
      *         {@code readerIndex}
+     * 将读指针位置恢复到保存的标记的读指针位置
      */
     public abstract ByteBuf resetReaderIndex();
 
@@ -489,6 +518,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * reposition the current {@code writerIndex} to the marked
      * {@code writerIndex} by calling {@link #resetWriterIndex()}.
      * The initial value of the marked {@code writerIndex} is {@code 0}.
+     * 标记写指针位置，可使用resetWriterIndex方法将写指针恢复到标记的写指针位置
      */
     public abstract ByteBuf markWriterIndex();
 
@@ -499,6 +529,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * @throws IndexOutOfBoundsException
      *         if the current {@code readerIndex} is greater than the marked
      *         {@code writerIndex}
+     * 将写指针位置恢复到保存的标记的写指针位置
      */
     public abstract ByteBuf resetWriterIndex();
 
@@ -1666,6 +1697,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      *
      * @throws IndexOutOfBoundsException
      *         if {@code dst.length} is greater than {@code this.readableBytes}
+     * 将ByteBuf中的数据读取到指定的字节数组中去
      */
     public abstract ByteBuf readBytes(byte[] dst);
 
@@ -1955,6 +1987,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * by the number of the transferred bytes (= {@code src.length}).
      * If {@code this.writableBytes} is less than {@code src.length}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * 将指定字节数组中的数据写到ByteBuf中
      */
     public abstract ByteBuf writeBytes(byte[] src);
 
@@ -2163,6 +2196,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * This method is identical to {@code buf.copy(buf.readerIndex(), buf.readableBytes())}.
      * This method does not modify {@code readerIndex} or {@code writerIndex} of
      * this buffer.
+     * 返回ByteBuf的可读字节的拷贝，新的ByteBuf和当前的ByteBuf的修改相互不受影响
      */
     public abstract ByteBuf copy();
 
@@ -2184,6 +2218,10 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * <p>
      * Also be aware that this method will NOT call {@link #retain()} and so the
      * reference count will NOT be increased.
+     * 返回当前ByteBuf可读的一部分，新的ByteBuf有自己的readerIndex、writerIndex，
+     * 修改新的ByteBuf数据和当前的ByteBuf数据会相互影响。
+     *
+     * 新的ByteBuf和当前的ByteBuf共享底层分配的内存、引用计数。
      */
     public abstract ByteBuf slice();
 
@@ -2238,6 +2276,10 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * @return A buffer whose readable content is equivalent to the buffer returned by {@link #slice()}.
      * However this buffer will share the capacity of the underlying buffer, and therefore allows access to all of the
      * underlying content if necessary.
+     * 拷贝整个ByteBuf，新的ByteBuf有自己的readerIndex、writerIndex，
+     * 修改新的ByteBuf数据和当前的ByteBuf数据会相互影响。
+     *
+     * 新的ByteBuf和当前的ByteBuf共享底层分配的内存、引用计数。
      */
     public abstract ByteBuf duplicate();
 

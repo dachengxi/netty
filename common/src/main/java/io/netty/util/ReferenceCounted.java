@@ -37,6 +37,7 @@ public interface ReferenceCounted {
 
     /**
      * Increases the reference count by {@code 1}.
+     * 引用计数加1
      */
     ReferenceCounted retain();
 
@@ -64,6 +65,7 @@ public interface ReferenceCounted {
      * {@code 0}.
      *
      * @return {@code true} if and only if the reference count became {@code 0} and this object has been deallocated
+     * 引用计数减1
      */
     boolean release();
 
