@@ -26,10 +26,22 @@ import java.util.List;
 import static java.lang.Math.*;
 
 final class PoolChunkList<T> implements PoolChunkListMetric {
+    /*
+        多个内存使用率相近的PoolChunkList会组成一个双向链表存放在PoolChunkList中。
+        PoolChunkList管理这些PoolChunk的生命周期
+     */
     private static final Iterator<PoolChunkMetric> EMPTY_METRICS = Collections.<PoolChunkMetric>emptyList().iterator();
     private final PoolArena<T> arena;
     private final PoolChunkList<T> nextList;
+
+    /**
+     * PoolChunk内存使用率下限
+     */
     private final int minUsage;
+
+    /**
+     * PoolChunk内存使用率上限
+     */
     private final int maxUsage;
     private final int maxCapacity;
     private PoolChunk<T> head;

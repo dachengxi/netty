@@ -49,14 +49,61 @@ abstract class PoolArena<T> implements PoolArenaMetric {
     final int numSmallSubpagePools;
     final int directMemoryCacheAlignment;
     final int directMemoryCacheAlignmentMask;
+
+    /**
+     * 存放tiny类型的内存块，0~512B之间的内存块
+     */
     private final PoolSubpage<T>[] tinySubpagePools;
+
+    /**
+     * 存放small类型的内存块，512~8K之间的内存块
+     */
     private final PoolSubpage<T>[] smallSubpagePools;
 
+    /*
+        下面的qXXX除了qInit之外，相互之间形成了一个双向链表，一个Chunk的使用率会发生变化，
+        Netty也会重新检查Chunk的使用率，并移动到对应的PoolChunkList中去.
+
+        qInit --> q000 <--> q025 <--> q050 <--> q075 <--> q100
+
+
+     */
+
+    /**
+     * 存放使用率为50%~100%的Chunk
+     */
     private final PoolChunkList<T> q050;
+
+    /**
+     * 存放使用率为25~75%的Chunk
+     */
     private final PoolChunkList<T> q025;
+
+    /**
+     * 存放使用率为1~50%的Chunk
+     *
+     * q000的PoolChunk的内存被完全释放后，PoolChunk会从链表中移除掉，内存也会被回收掉
+     */
     private final PoolChunkList<T> q000;
+
+    /**
+     * 存放使用率为0~25%的Chunk
+     *
+     * qInit用于存储初始分配的PoolChunk。第一次分配内存时PoolChunkList中没有
+     * 可用的PoolChunk，需要创建一个新的PoolChunk添加到qInit列表中。
+     *
+     * qInit中的PoolChunk内存被完全释放后，不会被回收，避免PoolChunk重复初始化工作。
+     */
     private final PoolChunkList<T> qInit;
+
+    /**
+     * 存放使用率为75~100%的Chunk
+     */
     private final PoolChunkList<T> q075;
+
+    /**
+     * 存放使用率为100%的Chunk
+     */
     private final PoolChunkList<T> q100;
 
     private final List<PoolChunkListMetric> chunkListMetrics;
@@ -232,8 +279,20 @@ abstract class PoolArena<T> implements PoolArenaMetric {
         }
     }
 
+    /**
+     * 分配normal类型的内存，大于8K小于16M的内存块
+     * @param buf
+     * @param reqCapacity
+     * @param normCapacity
+     */
     // Method must be called inside synchronized(this) { ... } block
     private void allocateNormal(PooledByteBuf<T> buf, int reqCapacity, int normCapacity) {
+        /*
+            分配顺序q050 --> q025 --> qInit --> qInit --> q075
+            q000的PoolChunk的内存被完全释放后，PoolChunk会从链表中移除掉，内存也会被回收掉。在频繁分配内存的场景下，
+            如果从q000开始分配，则会有大量的PoolChunk被创建和销毁，性能会降低，从q050开始分配内存，回事PoolChunk的
+            使用率范围保持在中间水平，降低PoolChunk被回收的概率。
+         */
         if (q050.allocate(buf, reqCapacity, normCapacity) || q025.allocate(buf, reqCapacity, normCapacity) ||
             q000.allocate(buf, reqCapacity, normCapacity) || qInit.allocate(buf, reqCapacity, normCapacity) ||
             q075.allocate(buf, reqCapacity, normCapacity)) {

@@ -185,6 +185,11 @@ final class PoolChunk<T> implements PoolChunkMetric {
 
      */
 
+    /*
+        PoolChunk用来管理内存的分配和回收，默认每个PoolChunk大小为16M。
+        PoolChunk是Page的集合，Netty会将PoolChunk使用伙伴算法分成2048个Page，以满二叉树的形式组织。
+     */
+
     private static final int INTEGER_SIZE_MINUS_ONE = Integer.SIZE - 1;
 
     final PoolArena<T> arena;
@@ -192,7 +197,15 @@ final class PoolChunk<T> implements PoolChunkMetric {
     final boolean unpooled;
     final int offset;
 
+    /**
+     * 记录满二叉树节点的分配信息，初始值和depthMap一样。
+     * memoryMap会随着节点的分配，不断变化。
+     */
     private final byte[] memoryMap;
+
+    /**
+     * 存放满二叉树的节点对应的的高度，这里面的值不会变化
+     */
     private final byte[] depthMap;
     private final PoolSubpage<T>[] subpages;
     /** Used to determine if the requested capacity is equal to or greater than pageSize. */
