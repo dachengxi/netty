@@ -36,6 +36,12 @@ import java.util.Queue;
  * Scalable memory allocation using jemalloc</a>.
  */
 final class PoolThreadCache {
+    /*
+        内存释放时，Netty不会将缓存还给Chunk，而是使用PoolThreadCache缓存起来，供后面
+        分配内存的时候使用。
+
+        有三种类型的内存可以缓存：tiny，small，normal，并且区分是堆内存还是堆外内存。
+     */
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(PoolThreadCache.class);
 
@@ -43,11 +49,35 @@ final class PoolThreadCache {
     final PoolArena<ByteBuffer> directArena;
 
     // Hold the caches for the different size classes, which are tiny, small and normal.
+
+    /**
+     * 缓存tiny类型的堆内存，长度32
+     */
     private final MemoryRegionCache<byte[]>[] tinySubPageHeapCaches;
+
+    /**
+     * 缓存small类型的堆内存，长度4
+     */
     private final MemoryRegionCache<byte[]>[] smallSubPageHeapCaches;
+
+    /**
+     * 缓存tiny类型的堆外内存，长度32
+     */
     private final MemoryRegionCache<ByteBuffer>[] tinySubPageDirectCaches;
+
+    /**
+     * 缓存small类型的堆外内存，长度4
+     */
     private final MemoryRegionCache<ByteBuffer>[] smallSubPageDirectCaches;
+
+    /**
+     * 缓存normal类型的堆内存，长度3
+     */
     private final MemoryRegionCache<byte[]>[] normalHeapCaches;
+
+    /**
+     * 缓存normal类型的堆外内存，长度3
+     */
     private final MemoryRegionCache<ByteBuffer>[] normalDirectCaches;
 
     // Used for bitshifting when calculate the index of normal caches later
@@ -350,8 +380,23 @@ final class PoolThreadCache {
     }
 
     private abstract static class MemoryRegionCache<T> {
+        /*
+            MemoryRegionCache内部使用一个MPSC无锁队列存储空闲的内存
+         */
+
+        /**
+         * 存储的内存块的大小
+         */
         private final int size;
+
+        /**
+         * 用来存储内存块的MQSC队列
+         */
         private final Queue<Entry<T>> queue;
+
+        /**
+         * 存储的内存块的类型，有三种：tiny、small、normal
+         */
         private final SizeClass sizeClass;
         private int allocations;
 

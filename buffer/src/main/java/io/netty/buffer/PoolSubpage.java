@@ -18,20 +18,61 @@ package io.netty.buffer;
 
 final class PoolSubpage<T> implements PoolSubpageMetric {
 
+    /*
+        分配的内存小于8K的时候，会使用PoolSubpage进行管理，在一个PoolSubpage中包含的所有内存块
+        大小都相同，使用一个位图bitmap来记录内存块是否被使用。
+     */
+
     final PoolChunk<T> chunk;
+
+    /**
+     * 对应满二叉树节点的下标
+     */
     private final int memoryMapIdx;
+
+    /**
+     * PoolSubpage在PoolChunk中的内存偏移量
+     */
     private final int runOffset;
     private final int pageSize;
+
+    /**
+     * 记录每个小内存块是否被使用
+     */
     private final long[] bitmap;
 
+    /**
+     * 上一个PoolSubpage，PoolSubpage之间组成了一个双向链表
+     */
     PoolSubpage<T> prev;
+
+    /**
+     * 下一个PoolSubpage，PoolSubpage之间组成了一个双向链表
+     */
     PoolSubpage<T> next;
 
     boolean doNotDestroy;
+
+    /**
+     * PoolSubpage中每个小内存块的大小
+     */
     int elemSize;
+
+    /**
+     * PoolSubpage中最多可以存放多少个内存块。
+     * 大小是：8K / elemSize
+     */
     private int maxNumElems;
+
+    /**
+     * 位图的长度
+     */
     private int bitmapLength;
     private int nextAvail;
+
+    /**
+     * 可用的内存块个数
+     */
     private int numAvail;
 
     // TODO: Test if adding padding helps under contention

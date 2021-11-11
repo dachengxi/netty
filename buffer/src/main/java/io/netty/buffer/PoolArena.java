@@ -29,6 +29,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static java.lang.Math.max;
 
 abstract class PoolArena<T> implements PoolArenaMetric {
+    /*
+        PoolArena和PoolThreadCache都负责线程的内存分配，PoolArena是多个线程共享的，
+        PoolThreadCache是每个线程私有的。
+
+        - 分配内存大于8K时，PoolChunk进行管理，管理的大小时Page级别
+        - 分配内存小于8K时，使用PoolSubpage进行管理，同时也会使用PoolThreadCache的缓存进行分配
+     */
     static final boolean HAS_UNSAFE = PlatformDependent.hasUnsafe();
 
     enum SizeClass {

@@ -193,20 +193,28 @@ final class PoolChunk<T> implements PoolChunkMetric {
     private static final int INTEGER_SIZE_MINUS_ONE = Integer.SIZE - 1;
 
     final PoolArena<T> arena;
+
+    /**
+     * 存储的数据
+     */
     final T memory;
     final boolean unpooled;
     final int offset;
 
     /**
-     * 记录满二叉树节点的分配信息，初始值和depthMap一样。
-     * memoryMap会随着节点的分配，不断变化。
+     * 记录满二叉树节点的分配信息，也就是树中的节点是否被分配，初始值和depthMap一样。
+     * 数组大小为4096，memoryMap会随着节点的分配，不断变化。
      */
     private final byte[] memoryMap;
 
     /**
-     * 存放满二叉树的节点对应的的高度，这里面的值不会变化
+     * 存放满二叉树的节点对应的的高度，这里面的值不会变化，数组大小为4096。
      */
     private final byte[] depthMap;
+
+    /**
+     * PoolChunk管理的8K（Page）的内存块，数组大小为2048。
+     */
     private final PoolSubpage<T>[] subpages;
     /** Used to determine if the requested capacity is equal to or greater than pageSize. */
     private final int subpageOverflowMask;
@@ -219,6 +227,9 @@ final class PoolChunk<T> implements PoolChunkMetric {
     /** Used to mark memory as unusable */
     private final byte unusable;
 
+    /**
+     * 剩余的内存大小
+     */
     private int freeBytes;
 
     PoolChunkList<T> parent;
@@ -308,9 +319,11 @@ final class PoolChunk<T> implements PoolChunkMetric {
     }
 
     long allocate(int normCapacity) {
+        // 大于等于8K的使用PoolChunk进行管理
         if ((normCapacity & subpageOverflowMask) != 0) { // >= pageSize
             return allocateRun(normCapacity);
         } else {
+            // 小于8K的使用PoolSubpage进行管理
             return allocateSubpage(normCapacity);
         }
     }
@@ -395,14 +408,23 @@ final class PoolChunk<T> implements PoolChunkMetric {
      *
      * @param normCapacity normalized capacity
      * @return index in memoryMap
+     *
+     * 分配大于等于8K的内存
      */
     private long allocateRun(int normCapacity) {
+        // 根据要分配的内存大小，计算出二叉树对应的节点的高度
         int d = maxOrder - (log2(normCapacity) - pageShifts);
+
+        // 查找对应高度中是否存在可用节点
         int id = allocateNode(d);
         if (id < 0) {
             return id;
         }
+
+        // 已分配的内存大小要从空闲的大小中减去
         freeBytes -= runLength(id);
+
+        // 返回memoryMap中对应的索引
         return id;
     }
 
@@ -416,9 +438,12 @@ final class PoolChunk<T> implements PoolChunkMetric {
     private long allocateSubpage(int normCapacity) {
         // Obtain the head of the PoolSubPage pool that is owned by the PoolArena and synchronize on it.
         // This is need as we may add it back and so alter the linked-list structure.
+        // 根据要分配的内存大小找到PoolArea中对应的Subpage数组的头节点
         PoolSubpage<T> head = arena.findSubpagePoolHead(normCapacity);
         synchronized (head) {
+            // 小于8K的内存一定在叶子结点，直接从二叉树最底层开始查找
             int d = maxOrder; // subpages are only be allocated from pages i.e., leaves
+            // 从二叉树中找到一个可用节点
             int id = allocateNode(d);
             if (id < 0) {
                 return id;
@@ -432,11 +457,13 @@ final class PoolChunk<T> implements PoolChunkMetric {
             int subpageIdx = subpageIdx(id);
             PoolSubpage<T> subpage = subpages[subpageIdx];
             if (subpage == null) {
+                // 创建PoolSubpage对象，会将内存切分为大小相同的自内存块，然后加入到PoolArena的双向链表中
                 subpage = new PoolSubpage<T>(head, this, id, runOffset(id), pageSize, normCapacity);
                 subpages[subpageIdx] = subpage;
             } else {
                 subpage.init(head, normCapacity);
             }
+            // 分配内存
             return subpage.allocate();
         }
     }
