@@ -188,17 +188,30 @@ final class PoolChunk<T> implements PoolChunkMetric {
     /*
         PoolChunk用来管理内存的分配和回收，默认每个PoolChunk大小为16M。
         PoolChunk是Page的集合，Netty会将PoolChunk使用伙伴算法分成2048个Page，以满二叉树的形式组织。
+
+        PoolChunk对应jemalloc 3.x的算法。
      */
 
     private static final int INTEGER_SIZE_MINUS_ONE = Integer.SIZE - 1;
 
+    /**
+     * 持有当前PoolChunk的Arena
+     */
     final PoolArena<T> arena;
 
     /**
-     * 存储的数据
+     * 存储的数据，如果是堆内存，则是byte[]；如果是直接内存，则是ByteBuffer
      */
     final T memory;
+
+    /**
+     * 当前PoolChunk是否使用池化管理，如果是Huge级别的内存，则unpooled始终为true
+     */
     final boolean unpooled;
+
+    /**
+     * 内存对齐使用的偏移量
+     */
     final int offset;
 
     /**
@@ -218,13 +231,41 @@ final class PoolChunk<T> implements PoolChunkMetric {
     private final PoolSubpage<T>[] subpages;
     /** Used to determine if the requested capacity is equal to or greater than pageSize. */
     private final int subpageOverflowMask;
+
+    /**
+     * page的大小，8K
+     */
     private final int pageSize;
+
+    /**
+     * page偏移量，默认13
+     */
     private final int pageShifts;
+
+    /**
+     * 满二叉树的高度11
+     */
     private final int maxOrder;
+
+    /**
+     * Chunk大小，默认16M
+     */
     private final int chunkSize;
+
+    /**
+     * chunkSize取2的对数，默认24
+     */
     private final int log2ChunkSize;
+
+    /**
+     * PoolSubpage数组长度，默认2048
+     */
     private final int maxSubpageAllocs;
-    /** Used to mark memory as unusable */
+
+    /**
+     * Used to mark memory as unusable
+     * 一个节点不可用的时候，会将对应memoryMap[id]设置为unusable，默认是12
+     */
     private final byte unusable;
 
     /**
@@ -233,7 +274,15 @@ final class PoolChunk<T> implements PoolChunkMetric {
     private int freeBytes;
 
     PoolChunkList<T> parent;
+
+    /**
+     * PoolChunk的前一个节点
+     */
     PoolChunk<T> prev;
+
+    /**
+     * PoolChunk的后一个节点
+     */
     PoolChunk<T> next;
 
     // TODO: Test if adding padding helps under contention

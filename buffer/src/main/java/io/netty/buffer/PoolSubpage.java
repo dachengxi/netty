@@ -23,17 +23,24 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
         大小都相同，使用一个位图bitmap来记录内存块是否被使用。
      */
 
+    /**
+     * 持有当前PoolSubpage的PoolChunk
+     */
     final PoolChunk<T> chunk;
 
     /**
-     * 对应满二叉树节点的下标
+     * 对应满二叉树节点的下标，也就是位于memoryMap数组的下标索引
      */
     private final int memoryMapIdx;
 
     /**
-     * PoolSubpage在PoolChunk中的内存偏移量
+     * PoolSubpage相对起始叶子节点的偏移量
      */
     private final int runOffset;
+
+    /**
+     * Page大小，默认8K
+     */
     private final int pageSize;
 
     /**
@@ -68,10 +75,14 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
      * 位图的长度
      */
     private int bitmapLength;
+
+    /**
+     * 下一个可用的节点
+     */
     private int nextAvail;
 
     /**
-     * 可用的内存块个数
+     * 剩余可用的内存块个数
      */
     private int numAvail;
 
@@ -92,7 +103,7 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
         this.chunk = chunk;
         this.memoryMapIdx = memoryMapIdx;
         this.runOffset = runOffset;
-        this.pageSize = pageSize;
+        this.pageSize = pageSize;A
         bitmap = new long[pageSize >>> 10]; // pageSize / 16 / 64
         init(head, elemSize);
     }

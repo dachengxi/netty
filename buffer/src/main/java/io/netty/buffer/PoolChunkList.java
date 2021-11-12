@@ -31,22 +31,41 @@ final class PoolChunkList<T> implements PoolChunkListMetric {
         PoolChunkList管理这些PoolChunk的生命周期
      */
     private static final Iterator<PoolChunkMetric> EMPTY_METRICS = Collections.<PoolChunkMetric>emptyList().iterator();
+
+    /**
+     * 管理当前PoolChunkList的Arena
+     */
     private final PoolArena<T> arena;
+
+    /**
+     * PoolChunkList之间是双向链表结构，nextList是下一个PoolChunkList
+     */
     private final PoolChunkList<T> nextList;
 
     /**
-     * PoolChunk内存使用率下限
+     * 当前PoolChunkList中的PoolChunk的内存使用率下限
      */
     private final int minUsage;
 
     /**
-     * PoolChunk内存使用率上限
+     * 当前PoolChunkList中的PoolChunk的内存使用率上限
      */
     private final int maxUsage;
+
+    /**
+     * 一个PoolChunk最高可分配的内存大小
+     */
     private final int maxCapacity;
+
+    /**
+     * 当前PoolChunkList中包含的PoolChunk链表对应的头节点
+     */
     private PoolChunk<T> head;
 
     // This is only update once when create the linked like list of PoolChunkList in PoolArena constructor.
+    /**
+     * 上一个PoolChunkList
+     */
     private PoolChunkList<T> prevList;
 
     // TODO: Test if adding padding helps under contention
@@ -86,6 +105,13 @@ final class PoolChunkList<T> implements PoolChunkListMetric {
         this.prevList = prevList;
     }
 
+    /**
+     * PoolChunkList分配PooledByteBuf对象
+     * @param buf
+     * @param reqCapacity
+     * @param normCapacity
+     * @return
+     */
     boolean allocate(PooledByteBuf<T> buf, int reqCapacity, int normCapacity) {
         if (head == null || normCapacity > maxCapacity) {
             // Either this PoolChunkList is empty or the requested capacity is larger then the capacity which can
@@ -93,7 +119,9 @@ final class PoolChunkList<T> implements PoolChunkListMetric {
             return false;
         }
 
+        // 从头节点开始遍历PoolChunkList中的PoolChunk链表
         for (PoolChunk<T> cur = head;;) {
+            // PoolChunk分配内存
             long handle = cur.allocate(normCapacity);
             if (handle < 0) {
                 cur = cur.next;
@@ -102,6 +130,8 @@ final class PoolChunkList<T> implements PoolChunkListMetric {
                 }
             } else {
                 cur.initBuf(buf, handle, reqCapacity);
+                // 当前PoolChunk使用率超过了规定的maxUsage，需要将当前的PoolChunk从当前的PoolChunkList中移除掉，
+                // 并将当前PoolChunk移到下一个PoolChunkList中去
                 if (cur.usage() >= maxUsage) {
                     remove(cur);
                     nextList.add(cur);
@@ -111,8 +141,17 @@ final class PoolChunkList<T> implements PoolChunkListMetric {
         }
     }
 
+    /**
+     * 释放PoolChunk对象
+     * @param chunk
+     * @param handle
+     * @return
+     */
     boolean free(PoolChunk<T> chunk, long handle) {
+        // PoolChunk释放对象
         chunk.free(handle);
+        // 释放完内存后如果当前PoolChunk使用率低于minUsage，则需要从当前的PoolChunkList中移除，
+        // 并将这个PoolChunk移到上一个PoolChunkList中去
         if (chunk.usage() < minUsage) {
             remove(chunk);
             // Move the PoolChunk down the PoolChunkList linked-list.
