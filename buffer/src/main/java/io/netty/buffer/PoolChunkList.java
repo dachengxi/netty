@@ -25,6 +25,10 @@ import java.util.List;
 
 import static java.lang.Math.*;
 
+/**
+ * 一个PoolChunkList中存放多个PoolChunk，同一个PoolChunkList中的PoolChunk的使用率相近。
+ * @param <T>
+ */
 final class PoolChunkList<T> implements PoolChunkListMetric {
     /*
         多个内存使用率相近的PoolChunkList会组成一个双向链表存放在PoolChunkList中。

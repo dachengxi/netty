@@ -34,10 +34,12 @@ import java.util.Queue;
  * technics of
  * <a href="https://www.facebook.com/notes/facebook-engineering/scalable-memory-allocation-using-jemalloc/480222803919">
  * Scalable memory allocation using jemalloc</a>.
+ *
+ * PoolThreadCache类似jemalloc中的线程本地缓存
  */
 final class PoolThreadCache {
     /*
-        内存释放时，Netty不会将缓存还给Chunk，而是使用PoolThreadCache缓存起来，供后面
+        内存释放时，Netty不会将缓存还给PoolChunk，而是使用PoolThreadCache缓存起来，供后面
         分配内存的时候使用。
 
         有三种类型的内存可以缓存：tiny，small，normal，并且区分是堆内存还是堆外内存。
@@ -45,7 +47,14 @@ final class PoolThreadCache {
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(PoolThreadCache.class);
 
+    /**
+     * 堆内存，PoolArena
+     */
     final PoolArena<byte[]> heapArena;
+
+    /**
+     * 堆外内存，PoolArena
+     */
     final PoolArena<ByteBuffer> directArena;
 
     // Hold the caches for the different size classes, which are tiny, small and normal.
@@ -216,6 +225,7 @@ final class PoolThreadCache {
             return false;
         }
         boolean allocated = cache.allocate(buf, reqCapacity);
+        // 默认执行8192次的allocate方法后，就会调用一个trim方法进行内存整理
         if (++ allocations >= freeSweepAllocationThreshold) {
             allocations = 0;
             trim();
@@ -379,6 +389,10 @@ final class PoolThreadCache {
         }
     }
 
+    /**
+     * 使用队列来存储某种类型的相同大小的内存
+     * @param <T>
+     */
     private abstract static class MemoryRegionCache<T> {
         /*
             MemoryRegionCache内部使用一个MPSC无锁队列存储空闲的内存

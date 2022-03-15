@@ -16,6 +16,11 @@
 
 package io.netty.buffer;
 
+/**
+ * PoolSubpage有两种含义：一种是PoolSubpage作为Chunk的最小管理单位（Page，Netty中没有定义Page，直接使用PoolSubpage来表示Page的概念），
+ * 一个PoolSubpage为8K；另外一种是表示Tiny和Small类型的小内存块，一个Page分为更小粒度的内存块，这样的小内存块也会用PoolSubpage来进行管理。
+ * @param <T>
+ */
 final class PoolSubpage<T> implements PoolSubpageMetric {
 
     /*
@@ -49,24 +54,28 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
     private final long[] bitmap;
 
     /**
-     * 上一个PoolSubpage，PoolSubpage之间组成了一个双向链表
+     * 上一个PoolSubpage
+     *
+     * 在PoolArena中tinySubpagePools或者smallSubpagePools中的PoolSubpage之间组成了一个双向链表
      */
     PoolSubpage<T> prev;
 
     /**
-     * 下一个PoolSubpage，PoolSubpage之间组成了一个双向链表
+     * 下一个PoolSubpage
+     *
+     * 在PoolArena中tinySubpagePools或者smallSubpagePools中的PoolSubpage之间组成了一个双向链表
      */
     PoolSubpage<T> next;
 
     boolean doNotDestroy;
 
     /**
-     * PoolSubpage中每个小内存块的大小
+     * 当前PoolSubpage中每个小内存块的大小
      */
     int elemSize;
 
     /**
-     * PoolSubpage中最多可以存放多少个内存块。
+     * 当前PoolSubpage中最多可以存放多少个内存块。
      * 大小是：8K / elemSize
      */
     private int maxNumElems;
@@ -128,6 +137,8 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
 
     /**
      * Returns the bitmap index of the subpage allocation.
+     *
+     * PoolSubpage分配内存。使用位图来记录内存的使用情况。
      */
     long allocate() {
         if (elemSize == 0) {
@@ -144,6 +155,7 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
         assert (bitmap[q] >>> r & 1) == 0;
         bitmap[q] |= 1L << r;
 
+        // numAvail为0的时候表示PoolSubpage没有可分配的内存块，需要从PoolArena对应的数组的双向链表中移除
         if (-- numAvail == 0) {
             removeFromPool();
         }

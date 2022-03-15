@@ -99,6 +99,9 @@ package io.netty.buffer;
  * memoryMap[id]= (depth_of_id, x)
  * where as per convention defined above
  * the second value (i.e, x) indicates that the first node which is free to be allocated is at depth x (from root)
+ *
+ * Chunk是Netty向操作系统申请内存的单位，Netty中内存的分配操作都是基于Chunk来完成。
+ * Netty中每个Chunk（也就是PoolChunk）默认是16M。
  */
 final class PoolChunk<T> implements PoolChunkMetric {
 
@@ -227,6 +230,8 @@ final class PoolChunk<T> implements PoolChunkMetric {
 
     /**
      * PoolChunk管理的8K（Page）的内存块，数组大小为2048。
+     *
+     * 用来记录那些Page被转化为了Subpage
      */
     private final PoolSubpage<T>[] subpages;
     /** Used to determine if the requested capacity is equal to or greater than pageSize. */
@@ -239,6 +244,8 @@ final class PoolChunk<T> implements PoolChunkMetric {
 
     /**
      * page偏移量，默认13
+     *
+     * 一个Chunk大小为8K=8192=2^13，所以pageShifts=13
      */
     private final int pageShifts;
 
@@ -428,6 +435,8 @@ final class PoolChunk<T> implements PoolChunkMetric {
      *
      * @param d depth
      * @return index in memoryMap
+     *
+     * 从指定深度的节点中找出一个空闲的节点
      */
     private int allocateNode(int d) {
         int id = 1;
@@ -461,10 +470,11 @@ final class PoolChunk<T> implements PoolChunkMetric {
      * 分配大于等于8K的内存
      */
     private long allocateRun(int normCapacity) {
-        // 根据要分配的内存大小，计算出二叉树对应的节点的高度
+        // 根据要分配的内存大小，计算出二叉树对应的节点的深度，也就是该在哪一层分配
+        // 假设normCapacity=8K，则d = 11 - (13 - 13) = 11
         int d = maxOrder - (log2(normCapacity) - pageShifts);
 
-        // 查找对应高度中是否存在可用节点
+        // 从该深度的节点中找出一个空闲的节点，id是memoryMap数组的索引
         int id = allocateNode(d);
         if (id < 0) {
             return id;
@@ -483,6 +493,8 @@ final class PoolChunk<T> implements PoolChunkMetric {
      *
      * @param normCapacity normalized capacity
      * @return index in memoryMap
+     *
+     * 分配小于8K的内存
      */
     private long allocateSubpage(int normCapacity) {
         // Obtain the head of the PoolSubPage pool that is owned by the PoolArena and synchronize on it.

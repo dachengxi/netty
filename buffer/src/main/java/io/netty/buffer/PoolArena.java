@@ -28,6 +28,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.lang.Math.max;
 
+/**
+ * PoolArena类似于jemalloc中的Arena。用来解决多线程之间的竞争问题。
+ * @param <T>
+ */
 abstract class PoolArena<T> implements PoolArenaMetric {
     /*
         PoolArena和PoolThreadCache都负责线程的内存分配，PoolArena是多个线程共享的，
@@ -38,9 +42,15 @@ abstract class PoolArena<T> implements PoolArenaMetric {
      */
     static final boolean HAS_UNSAFE = PlatformDependent.hasUnsafe();
 
+    /**
+     * SizeClass用来描述内存规格
+     */
     enum SizeClass {
+        // Tiny代表0～512B之间的内存块
         Tiny,
+        // Small代表512B～8K之间的内存块
         Small,
+        // Normal代表8K～16M之间的内存块
         Normal
     }
 
@@ -80,12 +90,14 @@ abstract class PoolArena<T> implements PoolArenaMetric {
     final int directMemoryCacheAlignmentMask;
 
     /**
-     * 存放tiny类型的内存块，0~512B之间的内存块
+     * 存放tiny类型的内存块，0~512B之间的内存块。PoolSubpage最小为16B，按照16B依次递增，
+     * 所以tiny类型的Subpage共32中情况，这里tinySubpagePools数组大小是32。
      */
     private final PoolSubpage<T>[] tinySubpagePools;
 
     /**
-     * 存放small类型的内存块，512~8K之间的内存块
+     * 存放small类型的内存块，512~8K之间的内存块。Small类型内存共4中情况：512B、1024B、2048B、4096B。
+     * 所以smallSubpagePools数组大小为4。
      */
     private final PoolSubpage<T>[] smallSubpagePools;
 
